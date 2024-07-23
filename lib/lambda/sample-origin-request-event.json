@@ -1,0 +1,283 @@
+{
+  "Records": [
+      {
+          "cf": {
+              "config": {
+                  "distributionDomainName": "dqw4p0lvam31f.cloudfront.net",
+                  "distributionId": "E4H7A8KWTZQ2Z",
+                  "eventType": "origin-request",
+                  "requestId": "u-6cIkxWwVVfuzrueGmp8cc4kuikabWtO8DxOmPNyuIoz2NJry1S9w=="
+              },
+              "request": {
+                  "body": {
+                      "action": "read-only",
+                      "data": "",
+                      "encoding": "base64",
+                      "inputTruncated": false
+                  },
+                  "clientIp": "73.234.17.9",
+                  "headers": {
+                      "host": [
+                          {
+                              "key": "Host",
+                              "value": "gf7sdwajpkcz5ji2xpqxxy7g5q0ichxt.lambda-url.us-east-2.on.aws"
+                          }
+                      ],
+                      "cloudfront-is-mobile-viewer": [
+                          {
+                              "key": "CloudFront-Is-Mobile-Viewer",
+                              "value": "false"
+                          }
+                      ],
+                      "cloudfront-is-tablet-viewer": [
+                          {
+                              "key": "CloudFront-Is-Tablet-Viewer",
+                              "value": "false"
+                          }
+                      ],
+                      "cloudfront-is-smarttv-viewer": [
+                          {
+                              "key": "CloudFront-Is-SmartTV-Viewer",
+                              "value": "false"
+                          }
+                      ],
+                      "cloudfront-is-desktop-viewer": [
+                          {
+                              "key": "CloudFront-Is-Desktop-Viewer",
+                              "value": "true"
+                          }
+                      ],
+                      "cloudfront-is-ios-viewer": [
+                          {
+                              "key": "CloudFront-Is-IOS-Viewer",
+                              "value": "false"
+                          }
+                      ],
+                      "cloudfront-is-android-viewer": [
+                          {
+                              "key": "CloudFront-Is-Android-Viewer",
+                              "value": "false"
+                          }
+                      ],
+                      "accept-language": [
+                          {
+                              "key": "Accept-Language",
+                              "value": "en-US,en;q=0.9"
+                          }
+                      ],
+                      "accept": [
+                          {
+                              "key": "Accept",
+                              "value": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7"
+                          }
+                      ],
+                      "cloudfront-forwarded-proto": [
+                          {
+                              "key": "CloudFront-Forwarded-Proto",
+                              "value": "https"
+                          }
+                      ],
+                      "x-forwarded-for": [
+                          {
+                              "key": "X-Forwarded-For",
+                              "value": "73.234.17.9"
+                          }
+                      ],
+                      "user-agent": [
+                          {
+                              "key": "User-Agent",
+                              "value": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+                          }
+                      ],
+                      "via": [
+                          {
+                              "key": "Via",
+                              "value": "1.1 e406989f3b0500de00f53c5e3d3606d8.cloudfront.net (CloudFront)"
+                          }
+                      ],
+                      "pragma": [
+                          {
+                              "key": "pragma",
+                              "value": "no-cache"
+                          }
+                      ],
+                      "cache-control": [
+                          {
+                              "key": "cache-control",
+                              "value": "no-cache"
+                          }
+                      ],
+                      "sec-ch-ua": [
+                          {
+                              "key": "sec-ch-ua",
+                              "value": "\"Chromium\";v=\"124\", \"Google Chrome\";v=\"124\", \"Not-A.Brand\";v=\"99\""
+                          }
+                      ],
+                      "sec-ch-ua-mobile": [
+                          {
+                              "key": "sec-ch-ua-mobile",
+                              "value": "?0"
+                          }
+                      ],
+                      "sec-ch-ua-platform": [
+                          {
+                              "key": "sec-ch-ua-platform",
+                              "value": "\"Windows\""
+                          }
+                      ],
+                      "upgrade-insecure-requests": [
+                          {
+                              "key": "upgrade-insecure-requests",
+                              "value": "1"
+                          }
+                      ],
+                      "sec-fetch-site": [
+                          {
+                              "key": "sec-fetch-site",
+                              "value": "none"
+                          }
+                      ],
+                      "sec-fetch-mode": [
+                          {
+                              "key": "sec-fetch-mode",
+                              "value": "navigate"
+                          }
+                      ],
+                      "sec-fetch-user": [
+                          {
+                              "key": "sec-fetch-user",
+                              "value": "?1"
+                          }
+                      ],
+                      "sec-fetch-dest": [
+                          {
+                              "key": "sec-fetch-dest",
+                              "value": "document"
+                          }
+                      ],
+                      "accept-encoding": [
+                          {
+                              "key": "accept-encoding",
+                              "value": "gzip, deflate, br, zstd"
+                          }
+                      ],
+                      "priority": [
+                          {
+                              "key": "priority",
+                              "value": "u=0, i"
+                          }
+                      ],
+                      "cloudfront-viewer-http-version": [
+                          {
+                              "key": "CloudFront-Viewer-HTTP-Version",
+                              "value": "2.0"
+                          }
+                      ],
+                      "cloudfront-viewer-country": [
+                          {
+                              "key": "CloudFront-Viewer-Country",
+                              "value": "US"
+                          }
+                      ],
+                      "cloudfront-viewer-country-name": [
+                          {
+                              "key": "CloudFront-Viewer-Country-Name",
+                              "value": "United States"
+                          }
+                      ],
+                      "cloudfront-viewer-country-region": [
+                          {
+                              "key": "CloudFront-Viewer-Country-Region",
+                              "value": "MA"
+                          }
+                      ],
+                      "cloudfront-viewer-country-region-name": [
+                          {
+                              "key": "CloudFront-Viewer-Country-Region-Name",
+                              "value": "Massachusetts"
+                          }
+                      ],
+                      "cloudfront-viewer-city": [
+                          {
+                              "key": "CloudFront-Viewer-City",
+                              "value": "Quincy"
+                          }
+                      ],
+                      "cloudfront-viewer-postal-code": [
+                          {
+                              "key": "CloudFront-Viewer-Postal-Code",
+                              "value": "02169"
+                          }
+                      ],
+                      "cloudfront-viewer-time-zone": [
+                          {
+                              "key": "CloudFront-Viewer-Time-Zone",
+                              "value": "America/New_York"
+                          }
+                      ],
+                      "cloudfront-viewer-metro-code": [
+                          {
+                              "key": "CloudFront-Viewer-Metro-Code",
+                              "value": "506"
+                          }
+                      ],
+                      "cloudfront-viewer-latitude": [
+                          {
+                              "key": "CloudFront-Viewer-Latitude",
+                              "value": "42.24630"
+                          }
+                      ],
+                      "cloudfront-viewer-longitude": [
+                          {
+                              "key": "CloudFront-Viewer-Longitude",
+                              "value": "-70.99720"
+                          }
+                      ],
+                      "cloudfront-viewer-address": [
+                          {
+                              "key": "CloudFront-Viewer-Address",
+                              "value": "73.234.17.9:64383"
+                          }
+                      ],
+                      "cloudfront-viewer-tls": [
+                          {
+                              "key": "CloudFront-Viewer-TLS",
+                              "value": "TLSv1.3:TLS_AES_128_GCM_SHA256:connectionReused"
+                          }
+                      ],
+                      "cloudfront-viewer-asn": [
+                          {
+                              "key": "CloudFront-Viewer-ASN",
+                              "value": "7922"
+                          }
+                      ]
+                  },
+                  "method": "GET",
+                  "origin": {
+                      "custom": {
+                          "customHeaders": {
+                              "app_authorization": [
+                                  {
+                                      "key": "APP_AUTHORIZATION",
+                                      "value": "true"
+                                  }
+                              ]
+                          },
+                          "domainName": "gf7sdwajpkcz5ji2xpqxxy7g5q0ichxt.lambda-url.us-east-2.on.aws",
+                          "keepaliveTimeout": 5,
+                          "path": "",
+                          "port": 443,
+                          "protocol": "https",
+                          "readTimeout": 30,
+                          "sslProtocols": [
+                              "TLSv1.2"
+                          ]
+                      }
+                  },
+                  "querystring": "",
+                  "uri": "/private/page"
+              }
+          }
+      }
+  ]
+}
