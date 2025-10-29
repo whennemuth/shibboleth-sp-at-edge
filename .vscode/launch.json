@@ -46,6 +46,33 @@
         "AWS_PROFILE": "bu",
         "AWS_REGION": "us-east-2"
       }
-    }
+    },
+    {
+      "type": "node",
+      "request": "launch",
+      "name": "Debug current file as jest test",
+      "program": "${workspaceFolder}/node_modules/jest/bin/jest.js",
+      "args": [ 
+        "--runTestsByPath", 
+        "-i", 
+        "${file}" 
+      ],
+      "runtimeArgs": [ "--experimental-vm-modules" ],
+      "console": "integratedTerminal",
+      "internalConsoleOptions": "neverOpen",
+    },
+    {
+      "type": "node",
+      "request": "launch",
+      "name": "Debug current file",
+      "skipFiles": [ "<node_internals>/**" ],
+      "runtimeArgs": ["-r", "${workspaceFolder}/node_modules/ts-node/register/transpile-only"],
+      "args": [ "${file}" ], 
+      "env": {
+        "AWS_PROFILE": "bu",
+        "AWS_REGION": "us-east-2"
+      }, 
+      "envFile": "${workspaceFolder}/debug.env"
+    },
   ]
 }
