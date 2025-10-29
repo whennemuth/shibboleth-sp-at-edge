@@ -1,11 +1,13 @@
 module.exports = {
+  preset: 'ts-jest',
   testEnvironment: 'node',
   roots: ['<rootDir>'],
   testMatch: ['**/*.test.ts', '**/*.test.js'],
   transform: {
-    '^.+\\.tsx?$': 'ts-jest',
-    '^.+\\.jsx?$': [ 
-      "esbuild-jest", {  sourcemap: true } 
-    ],
-  }
+    '^.+\\.tsx?$': 'ts-jest'
+  },
+  collectCoverageFrom: [
+    '**/*.{ts,tsx}',
+    '!**/*.d.ts'
+  ]
 };
