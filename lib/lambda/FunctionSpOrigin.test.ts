@@ -1,7 +1,7 @@
 import { jest } from '@jest/globals';
 import { IConfig, IRequest, IResponse } from 'shibboleth-sp';
 import { handler } from './FunctionSpOrigin';
-import { CachedKeys } from './Secrets';
+import { CachedKeys } from './SecretsCache';
 import { CloudFrontRequest, LambdaEdgeOriginRequestEvent } from './OriginRequestEventType';
 import { instanceOf } from '../Util';
 

@@ -3,7 +3,7 @@ import { IContext, Shibboleth } from '../../context/IContext';
 import * as contextJSON from '../../context/context.json';
 import { ParameterTester, instanceOf } from '../Util';
 import { LambdaEdgeOriginRequestEvent } from './OriginRequestEventType';
-import { CachedKeys, checkCache } from './Secrets';
+import { CachedKeys, checkCache } from './SecretsCache';
 
 const context = contextJSON as IContext;
 const { APP_LOGIN_HEADER, APP_LOGOUT_HEADER, CLOUDFRONT_CHALLENGE_HEADER, SHIBBOLETH } = context;
