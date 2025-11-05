@@ -6,7 +6,11 @@
       "name": "CDK Debugger (App)",
       "skipFiles": ["<node_internals>/**"],
       "runtimeArgs": ["-r", "${workspaceFolder}/node_modules/ts-node/register/transpile-only"],
-      "args": ["${workspaceFolder}/bin/App.ts"]
+      "args": ["${workspaceFolder}/bin/App.ts"],
+      "env": {
+        "AWS_PROFILE": "bu"
+      },
+      "envFile": "${workspaceFolder}/.env"
     },
     {
       "type": "node",
