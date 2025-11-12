@@ -6,8 +6,8 @@
   "EDGE_RESPONSE_VIEWER_FUNCTION_NAME": "SPFunctionViewer",
   "ORIGIN": {
     "originType": "alb",
-    "arn": "arn:aws:elasticloadbalancing:us-east-2:037860335094:loadbalancer/app/wp-wp-alb-questrom/ee233355a7e666a9",
-    "dnsName": "wp-wp-alb-questrom-1436663317.us-east-2.elb.amazonaws.com",
+    "stackId": "wp",
+    "dnsName": "wp-wp-alb-devl2-542475253.us-east-2.elb.amazonaws.com",
     "httpPort": 80,
     "httpsPort": 443,
     "subdomain": "wp2.warhen.work",
@@ -26,7 +26,7 @@
     "entryPoint": "https://shib-test.bu.edu/idp/profile/SAML2/Redirect/SSO",
     "logoutUrl": "https://shib-test.bu.edu/idp/logout.jsp",    
     "secret": {
-      "_secretArn": "arn:aws:secretsmanager:us-east-2:037860335094:secret:dev/wp/shib-sp-test-JML3FN",
+      "_secretArn": "arn:aws:secretsmanager:us-east-2:037860335094:secret:shibsp/wp/devl2-1nUwF9",
       "_refreshInterval": "3600000",
       "samlPrivateKeySecretFld": "wp-sp-key",
       "samlCertSecretFld": "wp-sp-cert",

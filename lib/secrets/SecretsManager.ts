@@ -12,7 +12,7 @@ import { IContext } from "../../context/IContext";
 export const createOrUpdateSecrets = async () => {
   const context = contextJSON as IContext;
 
-  const { STACK_ID, REGION, TAGS: { Landscape }, SHIBBOLETH: { entityId, idpCert, secret: { 
+  const { STACK_ID, ORIGIN: { stackId: ORIGIN_STACK_ID } = {}, REGION, TAGS: { Landscape }, SHIBBOLETH: { entityId, idpCert, secret: { 
     cloudfrontChallengeSecretFld, 
     jwtPrivateKeySecretFld, jwtPublicKeySecretFld, 
     samlCertSecretFld, samlPrivateKeySecretFld
@@ -26,7 +26,9 @@ export const createOrUpdateSecrets = async () => {
     samlPrivateKeySecretFld
   };
 
-  const secretName = `bu-auth/${STACK_ID}/${Landscape}`;
+  const secretName = ORIGIN_STACK_ID ? 
+    `${STACK_ID}/${ORIGIN_STACK_ID}/${Landscape}` : 
+    `${STACK_ID}/${Landscape}`;
 
   const description = `Stores shib key and cert pem content for ${entityId}`;
   const smSecret = new SecretsManagerSecret({ secretName, description, fldNames, region: REGION });
