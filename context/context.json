@@ -10,7 +10,7 @@
     "dnsName": "wp-wp-alb-questrom-1436663317.us-east-2.elb.amazonaws.com",
     "httpPort": 80,
     "httpsPort": 443,
-    "subdomain": "questrom.warhen.work",
+    "subdomain": "wp2.warhen.work",
     "appAuthorization": true
   }, 
   "DNS": {
@@ -38,6 +38,6 @@
   "TAGS": {
     "Service": "websites",
     "Function": "wordpress",
-    "Landscape": "questrom"
+    "Landscape": "devl2"
   }
 }

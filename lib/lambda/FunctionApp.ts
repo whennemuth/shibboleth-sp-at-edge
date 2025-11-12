@@ -1,7 +1,4 @@
-// import { JwtTools } from './lib/Jwt';
-// import { Keys } from './lib/Keys';
 import { JwtTools } from 'shibboleth-sp';
-
 import * as contextJSON from '../../context/context.json';
 import { IContext } from '../../context/IContext';
 

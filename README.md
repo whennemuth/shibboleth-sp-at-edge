@@ -44,7 +44,17 @@ A more detailed view of the interaction between the end-user, origin request lam
 2. Set the values for the [Runtime Context](https://docs.aws.amazon.com/cdk/v2/guide/context.html) by modifying the `./context/context.json` file accordingly.
    Most fields in `./context/context.json` are self-explanatory, but any additional explanation that might be needed can be found [here](./context/README.md).
    
-2. Deploy the stack from scratch
+2. Set the two secret values to complement the [Runtime Context](https://docs.aws.amazon.com/cdk/v2/guide/context.html) in a `./.env` file:
+   
+   - CLOUDFRONT_CHALLENGE: See `"CLOUDFRONT_CHALLENGE_HEADER"` in [the context.json doc](./context/README.md) for background on this field.
+   - SAML_PK: The private portion of the keypair used to authenticate with shibboleth. This can be in PEM format or just the raw key value. See `"SHIBBOTH.secret.samlCertSecretFld"` in [the context.json doc](./context/README.md) for background on this field. 
+   
+   ```
+   CLOUDFRONT_CHALLENGE="some_value"
+   SAML_PK="MIIG/gIBADANBgk...."
+   ```
+   
+4. Deploy the stack from scratch
 
    ```
    cdk deploy

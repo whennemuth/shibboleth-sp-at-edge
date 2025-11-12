@@ -47,14 +47,17 @@ export interface Shibboleth {
     secret:     Secret;
 }
 
-export interface Secret {
-    _secretArn:                   string;
-    _refreshInterval:             string;
+export interface SecretFieldNames {
     samlPrivateKeySecretFld:      string;
     samlCertSecretFld:            string;
     jwtPrivateKeySecretFld:       string;
     jwtPublicKeySecretFld:        string;
-    cloudfrontChallengeSecretFld: string
+    cloudfrontChallengeSecretFld: string;
+}
+
+export interface Secret extends SecretFieldNames {
+    _secretArn:                   string;
+    _refreshInterval:             string;
 }
 
 export interface Tags {
