@@ -13,3 +13,7 @@ export const ParameterTester = {
 }
 
 export const instanceOf = <T>(value: any, fieldName: string): value is T => fieldName in value;
+
+export const getClone = <T>(obj:T):T => {
+  return JSON.parse(JSON.stringify(obj)) as T;
+}

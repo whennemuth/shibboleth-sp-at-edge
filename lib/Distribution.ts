@@ -31,7 +31,7 @@ export class CloudfrontDistribution extends Construct {
   private testOrigin:OriginBase;
   private cloudFrontDistribution:Distribution;
 
-  constructor(stack: Construct, stackName: string, props?: any) {
+  constructor(stack: Construct, stackName: string, props?: { ignoreRoute53: boolean }) {
     
     super(stack, stackName);
 
@@ -43,6 +43,7 @@ export class CloudfrontDistribution extends Construct {
     const { validateContext, createDistribution, edgeLambdas } = this;
     const { REGION, ORIGIN } = context;
     const { originType } = (ORIGIN ?? {} as Origin);
+    const { ignoreRoute53=false } = props || {};
 
     // 1) Validate context parameters
     validateContext();
@@ -87,7 +88,7 @@ export class CloudfrontDistribution extends Construct {
     }
 
     // 5) Create the distribution
-    createDistribution();
+    createDistribution(ignoreRoute53);
 
     const { subdomain } = ORIGIN || {};
   
@@ -113,16 +114,15 @@ export class CloudfrontDistribution extends Construct {
     const { context: { ORIGIN, DNS } } = this;
     const { isBlank, isNotBlank, anyBlank, someBlankSomeNot} = ParameterTester;
     const { certificateARN, hostedZone } = DNS || {};
-    const { originType, arn, subdomain } = ORIGIN || {};
+    const { originType, subdomain } = ORIGIN || {};
 
     const err = (msg:string) => { throw new Error(msg); }
 
-    // An alb must be configured with dnsName and arn specified
+    // An alb must be configured with dnsName specified
     if(originType == OriginType.ALB) {
       const { dnsName } = (ORIGIN as OriginAlb);
       const msg = 'An alb origin was configured in context.json';
       if(isBlank(dnsName)) err(`${msg} without its dnsName value`);
-      if(isBlank(arn)) err(`${msg} without its arn value`)
     }
 
     // DNS should not be partially configured - Certificate and Route53 must go together.
@@ -153,7 +153,7 @@ export class CloudfrontDistribution extends Construct {
    * NOTE 2: ALL_VIEWER_EXCEPT_HOST_HEADER will ensure the HTTP_HOST header contains the origins host domain, 
    * not the domain of the cloudfront distribution. This keeps lambda function url origins working correctly,
    */
-  private createDistribution = () => {
+  private createDistribution = (ignoreRoute53: boolean) => {
     const { stack, context, origin, testOrigin, edgeLambdas } = this;
     const { isNotBlank, noneBlank } = ParameterTester;
     const { TAGS, STACK_ID, DNS, ORIGIN } = context;
@@ -238,6 +238,11 @@ export class CloudfrontDistribution extends Construct {
 
     // Create the cloudFront distribution
     this.cloudFrontDistribution = new Distribution(stack, distributionName, distributionProps);
+
+    if(ignoreRoute53) {
+      console.log(`Ignoring Route53 A record creation for distribution ${distributionName} as instructed.`);
+      return;
+    }
 
     // Create an A record in route 53 with the distribution as the target.
     if(customDomain()) {
