@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { App, Stack } from 'aws-cdk-lib';
+import { App, RemovalPolicy, Stack } from 'aws-cdk-lib';
 import { BuildOptions, build } from 'esbuild';
 import 'source-map-support/register';
 import { IContext, SecretFieldNames } from '../context/IContext';
@@ -7,10 +7,28 @@ import * as ctx from '../context/context.json';
 import { CloudfrontDistribution } from '../lib/Distribution';
 import { createOrUpdateSecrets } from '../lib/secrets/SecretsManager';
 import { SecretsManagerSecret } from '../lib/secrets/Secret';
+import { RetentionDays } from 'aws-cdk-lib/aws-logs';
 
+// Instatiate the app
 const app = new App();
+
+// Configure custom resource defaults
+CustomResourceConfig.of(app).addRemovalPolicy(RemovalPolicy.DESTROY);
+CustomResourceConfig.of(app).addLogRetentionLifetime(RetentionDays.ONE_WEEK);
+
+// Cast the context to the IContext type
 const context = ctx as IContext;
-app.node.setContext('stack-parms', context);
+
+/**
+ * @returns The name of the stack
+ */
+export const getStackName = ():string => {
+  const { STACK_ID, TAGS: { Landscape } } = context;
+  return `${STACK_ID}-${Landscape}`;
+}
+
+(async () => {
+
 const { 
   ACCOUNT:account, REGION:region, STACK_ID,
   SHIBBOLETH: { secret: { _secretArn } },
