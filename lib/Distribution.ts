@@ -1,11 +1,11 @@
-import { CfnOutput, RemovalPolicy } from 'aws-cdk-lib';
+import { CfnOutput, RemovalPolicy, Duration } from 'aws-cdk-lib';
 import { Certificate, ICertificate } from 'aws-cdk-lib/aws-certificatemanager';
-import { AllowedMethods, BehaviorOptions, CachePolicy, Distribution, DistributionProps, EdgeLambda, OriginBase, OriginRequestPolicy, PriceClass, ViewerProtocolPolicy } from 'aws-cdk-lib/aws-cloudfront';
+import { AllowedMethods, BehaviorOptions, CachePolicy, CachePolicyProps, CacheHeaderBehavior, CacheCookieBehavior, CacheQueryStringBehavior, Distribution, DistributionProps, EdgeLambda, OriginBase, OriginRequestPolicy, PriceClass, ViewerProtocolPolicy } from 'aws-cdk-lib/aws-cloudfront';
 import { HttpOrigin } from 'aws-cdk-lib/aws-cloudfront-origins';
 import { NodejsFunction } from 'aws-cdk-lib/aws-lambda-nodejs';
 import { Bucket, ObjectOwnership } from 'aws-cdk-lib/aws-s3';
 import { Construct } from 'constructs';
-import { IContext, Origin, OriginAlb, OriginFunctionUrl, OriginType } from '../context/IContext';
+import { CloudFrontCachingStrategy, IContext, Origin, OriginAlb, OriginFunctionUrl, OriginType } from '../context/IContext';
 import { createEdgeFunctionForOriginRequest } from './EdgeFunctionOriginRequest';
 import { createEdgeFunctionForViewerResponse } from './EdgeFunctionViewerResponse';
 import { getAlbOrigin } from './OriginAlb';
@@ -178,18 +178,61 @@ export class CloudfrontDistribution extends Construct {
      * @returns 
      */
     const getBehavior = (origin:OriginBase, customDomain:boolean):BehaviorOptions => {
+      const { STANDARD, BU_CACHE, NO_CACHE } = CloudFrontCachingStrategy;
+      const { context: { CLOUDFRONT_CACHING_STRATEGY=NO_CACHE } } = this;
       const { ALLOW_ALL, REDIRECT_TO_HTTPS } = ViewerProtocolPolicy;
       const { ALL_VIEWER, ALL_VIEWER_EXCEPT_HOST_HEADER } = OriginRequestPolicy
-    
-      return {
+
+      const behaviorOptions = {
         origin,
         edgeLambdas,
         allowedMethods: AllowedMethods.ALLOW_ALL,
         cachedMethods: AllowedMethods.ALLOW_GET_HEAD_OPTIONS,
         viewerProtocolPolicy: customDomain ? REDIRECT_TO_HTTPS : ALLOW_ALL,
-        cachePolicy: CachePolicy.CACHING_DISABLED, // See NOTE 1
-        originRequestPolicy: customDomain ? ALL_VIEWER : ALL_VIEWER_EXCEPT_HOST_HEADER, // See NOTE 2
-      } as BehaviorOptions
+        originRequestPolicy: customDomain ? ALL_VIEWER : ALL_VIEWER_EXCEPT_HOST_HEADER, // See NOTE 2        
+      } as BehaviorOptions;
+
+      switch(CLOUDFRONT_CACHING_STRATEGY) {
+        case STANDARD:
+          /**
+           * NOTE: You would not want to use this if WordPress is the origin. WordPress needs to
+           * process requests to determine if authentication is required. This would introduce the
+           * strong potential for cache hits and deprive WordPress of the opportunity to challenge
+           * unauthenticated users.
+           */
+          return {
+            ...behaviorOptions,
+            minTtl: Duration.seconds(0),
+            defaultTtl: Duration.days(1),
+            maxTtl: Duration.days(365)
+          } as BehaviorOptions;
+        case BU_CACHE:
+          /**
+           * NOTE: This cache policy is designed to intentionally introduce cache fragmentation by
+           * including auth cookies in the cache key. This ensures that authenticated and unauthenticated
+           * users receive the correct content. Additionally, certain headers are included to further
+           * refine the cache key based on common variations in user requests.
+           */
+          return {
+            ...behaviorOptions,
+            cachePolicy: new CachePolicy(this, 'BUCachePolicy', {
+              cachePolicyName: 'BU-Cache-Policy',
+              comment: 'Cache policy matching distributions involved with web-router',
+              cookieBehavior: CacheCookieBehavior.all(), // Forward all cookies in cache key
+              headerBehavior: CacheHeaderBehavior.allowList('Host', 'Referer', 'User-Agent', 'X-Upstream'),
+              queryStringBehavior: CacheQueryStringBehavior.all() // Forward all query strings in cache key
+            } as CachePolicyProps)
+          } as BehaviorOptions;
+        case NO_CACHE:
+          /**
+           * NOTE: Disables caching to ensure that every request is processed by the origin. This is
+           * essential for origins that need to handle authentication or dynamic content generation.
+           */
+          return {
+            ...behaviorOptions,
+            cachePolicy: CachePolicy.CACHING_DISABLED
+          } as BehaviorOptions
+      }      
     }
 
     /**

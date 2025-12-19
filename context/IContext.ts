@@ -9,9 +9,16 @@ export interface IContext {
     APP_LOGIN_HEADER:                   string;
     APP_LOGOUT_HEADER:                  string;
     CLOUDFRONT_CHALLENGE_HEADER:        string;
+    CLOUDFRONT_CACHING_STRATEGY?:       CloudFrontCachingStrategy;
     SHIBBOLETH:                         Shibboleth;
     TAGS:                               Tags;
 }
+
+export enum CloudFrontCachingStrategy {
+    NO_CACHE = 'no-cache',
+    STANDARD = 'standard',
+    BU_CACHE = 'bu-cache'
+};
 
 export enum OriginType {
     ALB = 'alb', FUNCTION_URL = 'function-url'

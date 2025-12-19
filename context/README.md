@@ -41,6 +41,10 @@ This stack can be configured against two modes:
 - CLOUDFRONT_CHALLENGE_HEADER: In order to establish an ALB as an origin, it must be internet facing, and it must be carefully locked down. In addition to only responding to https traffic, two additional measures are taken, where CLOUDFRONT_CHALLENGE_HEADER pertains to the second:
   1. The security group for the ALB must allow only ingress from Cloudfront IP address for the region of the distribution. A [Managed Prefix List](https://aws.amazon.com/blogs/networking-and-content-delivery/limit-access-to-your-origins-using-the-aws-managed-prefix-list-for-amazon-cloudfront/) for cloudfront is applied to the ALB security group as the only ingress rule.
   2. With ingress to the ALB restricted to the cloudfront service, now it must be further restricted to the specific SAML SP distribution. This distribution is configured to add a "secret" header value to each request it forwards to the ALB origin. The ALB is configured with a listener rule that allows through only requests that have this header and that its value matches the expected value. This approach is a standard AWS practice and is detailed here: [Restricting access to Application Load Balancers](https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/restrict-access-to-load-balancer.html)
+- CLOUDFRONT_CACHING_STRATEGY: This value indicates the caching strategy that the cloudfront distribution should apply. Options are:
+  - "no-cache": *default*, Cloudfront will not cache any content from the origin. Every request will be passed through to the origin.
+  - "standard": Cloudfront will apply its standard caching strategy.
+  - "bu-cache": Cloudfront will apply a caching strategy optimized for BU websites.
 - SHIBBOLETH:
   - entityId: The ID of your application service provider
   - idpCert: The public key as published by shibboleth at the IDP entity ID endpoint.
