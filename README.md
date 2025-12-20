@@ -46,7 +46,10 @@ A more detailed view of the interaction between the end-user, origin request lam
    
 2. Set the two secret values to complement the [Runtime Context](https://docs.aws.amazon.com/cdk/v2/guide/context.html) in a `./.env` file:
    
-   - CLOUDFRONT_CHALLENGE: See `"CLOUDFRONT_CHALLENGE_HEADER"` in [the context.json doc](./context/README.md) for background on this field.
+   - CLOUDFRONT_CHALLENGE_HEADER: In order to establish an ALB as an origin, it must be internet facing, and it must be carefully locked down. In addition to only responding to https traffic, two additional measures are taken, where CLOUDFRONT_CHALLENGE_HEADER pertains to the second:
+     1. The security group for the ALB must allow only ingress from Cloudfront IP address for the region of the distribution. A [Managed Prefix List](https://aws.amazon.com/blogs/networking-and-content-delivery/limit-access-to-your-origins-using-the-aws-managed-prefix-list-for-amazon-cloudfront/) for cloudfront is applied to the ALB security group as the only ingress rule.
+     2. With ingress to the ALB restricted to the cloudfront service, now it must be further restricted to the specific SAML SP distribution. This distribution is configured to add a "secret" header value to each request it forwards to the ALB origin. The ALB is configured with a listener rule that allows through only requests that have this header and that its value matches the expected value. This approach is a standard AWS practice and is detailed here: [Restricting access to Application Load Balancers](https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/restrict-access-to-load-balancer.html)
+
    - SAML_PK: The private portion of the keypair used to authenticate with shibboleth. This can be in PEM format or just the raw key value. See `"SHIBBOTH.secret.samlCertSecretFld"` in [the context.json doc](./context/README.md) for background on this field. 
    
    ```

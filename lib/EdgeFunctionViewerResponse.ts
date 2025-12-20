@@ -6,17 +6,18 @@ import path = require("path");
 import { EdgeLambda, LambdaEdgeEventType, experimental } from "aws-cdk-lib/aws-cloudfront";
 import { CloudfrontDistribution } from "./Distribution";
 
+export const EDGE_RESPONSE_VIEWER_FUNCTION_BASENAME = 'SPFunctionViewer';
 
 /**
  * Create the Lambda@Edge viewer response function.
  * It can be bundled as normal because the stack is in the correct region.
  */
 const createSameRegionEdgeFunction = (stack:Construct, context:IContext):NodejsFunction => {
-  const { STACK_ID, TAGS: { Landscape }, EDGE_RESPONSE_VIEWER_FUNCTION_NAME } = context;
+  const { STACK_ID, TAGS: { Landscape } } = context;
   const ftn = new NodejsFunction(stack, 'edge-function-viewer-response', {
     runtime: Runtime.NODEJS_18_X,
     entry: 'lib/lambda/FunctionSpViewer.ts',
-    functionName: `${STACK_ID}-${Landscape}-${EDGE_RESPONSE_VIEWER_FUNCTION_NAME}`,
+    functionName: `${STACK_ID}-${Landscape}-${EDGE_RESPONSE_VIEWER_FUNCTION_BASENAME}`,
   });
   return ftn;
 };
@@ -32,13 +33,13 @@ const createSameRegionEdgeFunction = (stack:Construct, context:IContext):NodejsF
  * @returns 
  */
 const createCrossRegionEdgeFunction = (scope:Construct, context:IContext):experimental.EdgeFunction => {
-  const { STACK_ID, TAGS: { Landscape }, EDGE_RESPONSE_VIEWER_FUNCTION_NAME } = context;
+  const { STACK_ID, TAGS: { Landscape } } = context;
   const { EDGE_VIEWER_RESPONSE_CODE_FILE:outfile } = CloudfrontDistribution
   const ftn = new experimental.EdgeFunction(scope, 'edge-function-viewer-response', {
     runtime: Runtime.NODEJS_18_X,
     handler: 'index.handler',
     code: Code.fromAsset(path.join(__dirname, `../${path.dirname(outfile)}`)),
-    functionName: `${STACK_ID}-${Landscape}-${EDGE_RESPONSE_VIEWER_FUNCTION_NAME}`
+    functionName: `${STACK_ID}-${Landscape}-${EDGE_RESPONSE_VIEWER_FUNCTION_BASENAME}`
   });
   return ftn;
 }

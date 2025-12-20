@@ -4,9 +4,10 @@ import * as contextJSON from '../../context/context.json';
 import { ParameterTester, instanceOf } from '../Util';
 import { LambdaEdgeOriginRequestEvent } from './OriginRequestEventType';
 import { CachedKeys, checkCache } from './SecretsCache';
+import { CLOUDFRONT_CHALLENGE_HEADER_NAME } from '../secrets/Secret';
 
 const context = contextJSON as IContext;
-const { APP_LOGIN_HEADER, APP_LOGOUT_HEADER, CLOUDFRONT_CHALLENGE_HEADER, SHIBBOLETH } = context;
+const { APP_LOGIN_HEADER, APP_LOGOUT_HEADER, SHIBBOLETH } = context;
 const { entityId, entryPoint, logoutUrl, idpCert } = SHIBBOLETH as Shibboleth;
 
 const cachedKeys:CachedKeys = { 
@@ -69,7 +70,7 @@ export const handler =  async (event:LambdaEdgeOriginRequestEvent) => {
     domain: cloudfrontDomain,
     samlParms: { entityId, entryPoint, idpCert, logoutUrl, key: samlPrivateKey, cert: samlCert } as SamlParms,
     customHeaders: [
-      { key: CLOUDFRONT_CHALLENGE_HEADER, value: cloudfrontChallenge }
+      { key: CLOUDFRONT_CHALLENGE_HEADER_NAME, value: cloudfrontChallenge }
     ],
     jwtPrivateKeyPEM: jwtPrivateKey,
     jwtPublicKeyPEM: jwtPublicKey

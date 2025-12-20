@@ -2,8 +2,6 @@
   "STACK_ID": "shibsp",
   "ACCOUNT": "037860335094",
   "REGION": "us-east-2",
-  "EDGE_REQUEST_ORIGIN_FUNCTION_NAME": "SPFunctionOrigin",
-  "EDGE_RESPONSE_VIEWER_FUNCTION_NAME": "SPFunctionViewer",
   "ORIGIN": {
     "originType": "alb",
     "stackId": "wp",
@@ -19,7 +17,6 @@
   } ,
   "APP_LOGIN_HEADER": "SHIB-HANDLER",
   "APP_LOGOUT_HEADER": "SHIB-IDP-LOGOUT",
-  "CLOUDFRONT_CHALLENGE_HEADER": "cloudfront-challenge",
   "CLOUDFRONT_CACHING_STRATEGY": "bu-cache",
   "SHIBBOLETH": {
     "entityId": "https://*.kualitest.research.bu.edu/shibboleth",
@@ -32,8 +29,7 @@
       "samlPrivateKeySecretFld": "wp-sp-key",
       "samlCertSecretFld": "wp-sp-cert",
       "jwtPrivateKeySecretFld": "wp-jwt-prikey",
-      "jwtPublicKeySecretFld": "wp-jwt-pubkey",
-      "cloudfrontChallengeSecretFld": "cloudfront-challenge"
+      "jwtPublicKeySecretFld": "wp-jwt-pubkey"
     }
   },
   "TAGS": {

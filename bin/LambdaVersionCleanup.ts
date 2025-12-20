@@ -1,12 +1,14 @@
 import { CloudFrontClient, DistributionSummary, GetDistributionCommand, GetDistributionCommandOutput, ListDistributionsCommand, ListDistributionsResult, UpdateDistributionCommand, } from "@aws-sdk/client-cloudfront";
 import { DeleteFunctionCommand, LambdaClient, ListVersionsByFunctionCommand, ListVersionsByFunctionCommandOutput } from "@aws-sdk/client-lambda";
+import {} from '../lib/EdgeFunctionOriginRequest';
+import { EDGE_REQUEST_ORIGIN_FUNCTION_BASENAME } from '../lib/EdgeFunctionOriginRequest';
+import { EDGE_RESPONSE_VIEWER_FUNCTION_BASENAME } from '../lib/EdgeFunctionViewerResponse';
 import { IContext } from '../context/IContext';
 import * as ctx from '../context/context.json';
 
 const context = ctx as IContext;
-const client = new LambdaClient();
 const cloudFrontClient = new CloudFrontClient();
-const { STACK_ID, REGION, TAGS: { Landscape }, EDGE_REQUEST_ORIGIN_FUNCTION_NAME, EDGE_RESPONSE_VIEWER_FUNCTION_NAME } = context;
+const { STACK_ID, REGION, TAGS: { Landscape } } = context;
 process.env.AWS_REGION = REGION;
 let dryrun:string;
 
@@ -74,23 +76,28 @@ export class Distribution {
 export class Lambda {
   private name:string;
   private versions:any[] = [];
+  private lambdaClient:LambdaClient;
+  private _functionExists:boolean = true; // Assume it exists until proven otherwise
 
-  constructor(name:string) {
+  constructor(name:string, lambdaClient:LambdaClient) {
     this.name = name;
+    this.lambdaClient = lambdaClient;
   }
 
   private loadVersions = async () => {
-    if(this.versions.length == 0) {
-      const command = new ListVersionsByFunctionCommand({ FunctionName: this.name });
+    const { name, versions, lambdaClient, lambdaClient: { config: { region }} } = this;
+    if(versions.length == 0) {
+      const command = new ListVersionsByFunctionCommand({ FunctionName: name });
       try {
-        const output:ListVersionsByFunctionCommandOutput = await client.send(command);
+        const output:ListVersionsByFunctionCommandOutput = await lambdaClient.send(command);
         output.Versions?.forEach(version => {
-          this.versions.push(getVersion(version.FunctionArn))
+          versions.push(getVersion(version.FunctionArn, lambdaClient))
         })
       }
       catch(e:any) {
         if(e.name && e.name == 'ResourceNotFoundException') {
-          console.log(`No such function ${this.name}`);
+          this._functionExists = false;
+          console.log(`No such function ${name} in region ${region.name}`);
         }
         else {
           throw(e);
@@ -104,17 +111,30 @@ export class Lambda {
    */
   public dumpPriorVersions = async () => {
     await this.loadVersions();
-    console.log('------------------------------------------------');
-    console.log(`    Deleting versions for: ${this.name}`)
-    console.log('------------------------------------------------');
-    this.versions.forEach(async version => {
+    if(!this._functionExists) {
+      return;
+    }
+    console.log(`Deleting versions for: ${this.name}`)
+    if(this.versions.length == 0) {
+      console.log(`No versions found for ${this.name}.`);
+      return;
+    }
+    let versionCount = 0;
+    for(const version of this.versions) {
       if(version.isPriorVersion()) {
-        version.delete();
+        console.log(`Deleting prior version: ${version.version()}...`);
+        await version.delete();
+        versionCount++;
       }
       else {
         console.log(`Leaving the latest version alone: ${version.version()}`)
       }
-    })
+    }
+    console.log(`Deleted ${versionCount} prior versions for ${this.name}.`);
+  }
+
+  public functionExists = (): boolean => {
+    return this._functionExists;
   }
 }
 
@@ -131,7 +151,7 @@ const sleep = (ms:number) => {
  * @param arn 
  * @returns 
  */
-const getVersion = (arn:string|undefined) => {
+const getVersion = (arn:string|undefined, lambdaClient:LambdaClient) => {
   const getArnPart = (fromRight:number) => {
     const parts:string[] = (arn||'').split(':');
     return parts[parts.length - fromRight];
@@ -150,15 +170,38 @@ const getVersion = (arn:string|undefined) => {
       const command = new DeleteFunctionCommand(input);
       if(dryrun) {
         console.log(`Dryrun delete: ${JSON.stringify(input)}`);
+        return;
       }
-      else {
-        console.log(`deleting ${JSON.stringify(input)}`);
-        const response = await client.send(command);
-        await sleep(300); // Slow it down to avoid TooManyRequestsException: Rate exceeded exception
+
+      // Retry logic for replicated functions
+      const maxRetries = 240;
+      let retryCount = 0;
+      
+      while (retryCount < maxRetries) {
+        try {
+          console.log(`Attempting to delete ${JSON.stringify(input)} (attempt ${retryCount + 1})`);
+          const response = await lambdaClient.send(command);
+          console.log(`Successfully deleted version ${getVersion()}`);
+          return;
+        } catch (error: any) {
+          if (error.name === 'InvalidParameterValueException' && 
+              error.message?.includes('replicated function')) {
+            retryCount++;
+            const backoffTime = Math.min(1000 * Math.pow(2, retryCount), 30000); // Cap at 30 seconds
+            console.log(`Replica still exists. Waiting ${backoffTime/1000}s before retry ${retryCount}/${maxRetries}...`);
+            await sleep(backoffTime);
+          } else {
+            console.error(`Failed to delete version ${getVersion()}: ${error.message}`);
+            throw error;
+          }
+        }
       }
+      
+      console.warn(`Failed to delete version ${getVersion()} after ${maxRetries} attempts. Replica may still be propagating.`);
     }
   }
 };
+
 
 /**
  * Delete all versions for all lambda functions
@@ -176,9 +219,19 @@ const deleteVersions = async (functionList:string) => {
 
   // 3) Delete all prior versions of every lambda@edge function (leaving only current version).
   if(functionArray.length > 0) {
+    const lambdaClientDefaultRegion = new LambdaClient();
+    const defaultRegion = lambdaClientDefaultRegion.config.region.name;
+    const lambdaClientUsEast1 = new LambdaClient({ region: 'us-east-1' });
     for(var i=0; i<functionArray.length; i++) {
-      var lambda = new Lambda(functionArray[i]);
+      const functionName = functionArray[i].trim();
+      console.log(`\nProcessing Lambda for ${functionName} in region ${defaultRegion}`);
+      var lambda = new Lambda(functionName, lambdaClientDefaultRegion);
       await lambda.dumpPriorVersions();
+      if( ! lambda.functionExists() && defaultRegion !== 'us-east-1') {
+        console.log(`\nProcessing Lambda for ${functionName} in region us-east-1`);
+        lambda = new Lambda(functionName, lambdaClientUsEast1);
+        await lambda.dumpPriorVersions();
+      }
     }
   }
   else {
@@ -187,8 +240,8 @@ const deleteVersions = async (functionList:string) => {
 }
 
 deleteVersions(
- `${EDGE_REQUEST_ORIGIN_FUNCTION_NAME}, \
-  ${EDGE_RESPONSE_VIEWER_FUNCTION_NAME}, \
+ `${STACK_ID}-${Landscape}-${EDGE_REQUEST_ORIGIN_FUNCTION_BASENAME}, \
+  ${STACK_ID}-${Landscape}-${EDGE_RESPONSE_VIEWER_FUNCTION_BASENAME}, \
   ${STACK_ID}-${Landscape}-app-function`
 ).then(() => {
   console.log('Completed. Wait an hour or two for cloudfront to delete its replicas before deleting the stack.');

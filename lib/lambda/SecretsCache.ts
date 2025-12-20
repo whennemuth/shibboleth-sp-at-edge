@@ -1,8 +1,9 @@
 import { GetSecretValueCommand, GetSecretValueCommandOutput, SecretsManagerClient } from "@aws-sdk/client-secrets-manager";
 import * as context from '../../context/context.json';
 import { Secret } from '../../context/IContext';
+import { CLOUDFRONT_CHALLENGE_HEADER_NAME } from "../secrets/Secret";
 
-const { _secretArn, _refreshInterval, samlCertSecretFld, samlPrivateKeySecretFld, jwtPublicKeySecretFld, jwtPrivateKeySecretFld, cloudfrontChallengeSecretFld } = context.SHIBBOLETH.secret as Secret;
+const { _secretArn, _refreshInterval, samlCertSecretFld, samlPrivateKeySecretFld, jwtPublicKeySecretFld, jwtPrivateKeySecretFld } = context.SHIBBOLETH.secret as Secret;
 const refreshInterval = parseInt(_refreshInterval)
 
 export type CachedKeys = {
@@ -57,7 +58,7 @@ export async function checkCache(cache:CachedKeys, config?:SecretsConfig): Promi
     jwtPublicKeySecretFld, 
     samlCertSecretFld, 
     samlPrivateKeySecretFld, 
-    cloudfrontChallengeSecretFld
+    cloudfrontChallengeSecretFld: CLOUDFRONT_CHALLENGE_HEADER_NAME
   };
   
   const now = Date.now();

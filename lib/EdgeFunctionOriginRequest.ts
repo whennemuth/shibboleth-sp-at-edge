@@ -7,6 +7,8 @@ import { Construct } from "constructs";
 import path = require("path");
 import { CloudfrontDistribution } from "./Distribution";
 
+export const EDGE_REQUEST_ORIGIN_FUNCTION_BASENAME = 'SPFunctionOrigin';
+
 /**
  * Create policy used by lambda@edge origin request function to access secrets manager.
  */
@@ -34,11 +36,11 @@ const getEdgeFunctionLoggingPolicy = ():PolicyStatement => {
  * It can be bundled as normal because the stack is in the correct region.
  */
 const createSameRegionEdgeFunction = (stack:Construct, context:IContext):NodejsFunction => {
-  const { STACK_ID, TAGS: { Landscape}, EDGE_REQUEST_ORIGIN_FUNCTION_NAME } = context;
+  const { STACK_ID, TAGS: { Landscape} } = context;
   const ftn = new NodejsFunction(stack, 'edge-function-origin-request', {
     runtime: Runtime.NODEJS_18_X,
     entry: 'lib/lambda/FunctionSpOrigin.ts',
-    functionName: `${STACK_ID}-${Landscape}-${EDGE_REQUEST_ORIGIN_FUNCTION_NAME}`,
+    functionName: `${STACK_ID}-${Landscape}-${EDGE_REQUEST_ORIGIN_FUNCTION_BASENAME}`,
     bundling: {
       externalModules: [ '@aws-sdk/*' ],
     }
@@ -67,13 +69,13 @@ const createSameRegionEdgeFunction = (stack:Construct, context:IContext):NodejsF
  * @returns 
  */
 const createCrossRegionEdgeFunction = (scope:Construct, context:IContext):experimental.EdgeFunction => {
-  const { STACK_ID, TAGS: { Landscape}, EDGE_REQUEST_ORIGIN_FUNCTION_NAME } = context;
+  const { STACK_ID, TAGS: { Landscape} } = context;
   const { EDGE_ORIGIN_REQUEST_CODE_FILE:outfile } = CloudfrontDistribution
   const ftn = new experimental.EdgeFunction(scope, 'edge-function-origin-request', {
     runtime: Runtime.NODEJS_18_X,
     handler: 'index.handler',
     code: Code.fromAsset(path.join(__dirname, `../${path.dirname(outfile)}`)),
-    functionName: `${STACK_ID}-${Landscape}-${EDGE_REQUEST_ORIGIN_FUNCTION_NAME}`
+    functionName: `${STACK_ID}-${Landscape}-${EDGE_REQUEST_ORIGIN_FUNCTION_BASENAME}`
   });
   ftn.addToRolePolicy(getEdgeFunctionSecretsManagerPolicy());
   ftn.addToRolePolicy(getEdgeFunctionLoggingPolicy());

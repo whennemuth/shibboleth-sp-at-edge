@@ -34,7 +34,7 @@ export const getAlbOrigin = (origin:OriginAlb) => {
     originPath: '/',
     customHeaders: {
       APP_AUTHORIZATION: `${appAuthorization}`,
-      // CLOUDFRONT_CHALLENGE_HEADER could be set here.
+      // CLOUDFRONT_CHALLENGE_HEADER_NAME could be set here.
     }       
   } as HttpOriginProps);
 }

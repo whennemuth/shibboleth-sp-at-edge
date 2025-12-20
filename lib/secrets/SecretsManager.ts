@@ -13,13 +13,11 @@ export const createOrUpdateSecrets = async () => {
   const context = contextJSON as IContext;
 
   const { STACK_ID, ORIGIN: { stackId: ORIGIN_STACK_ID } = {}, REGION, TAGS: { Landscape }, SHIBBOLETH: { entityId, idpCert, secret: { 
-    cloudfrontChallengeSecretFld, 
     jwtPrivateKeySecretFld, jwtPublicKeySecretFld, 
     samlCertSecretFld, samlPrivateKeySecretFld
   } } } = context;
 
   const fldNames = {
-    cloudfrontChallengeSecretFld,
     jwtPrivateKeySecretFld,
     jwtPublicKeySecretFld,
     samlCertSecretFld,

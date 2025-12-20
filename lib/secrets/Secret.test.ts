@@ -24,8 +24,7 @@ const fldNames = {
   "samlPrivateKeySecretFld": "wp-sp-key",
   "samlCertSecretFld": "wp-sp-cert",
   "jwtPrivateKeySecretFld": "wp-jwt-prikey",
-  "jwtPublicKeySecretFld": "wp-jwt-pubkey",
-  "cloudfrontChallengeSecretFld": "cloudfront-challenge"
+  "jwtPublicKeySecretFld": "wp-jwt-pubkey"
 } 
 
 const loadAllValues = (secret: SecretsManagerSecret) => {

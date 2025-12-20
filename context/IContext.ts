@@ -2,13 +2,10 @@ export interface IContext {
     STACK_ID:                           string;
     ACCOUNT:                            string;
     REGION:                             string;
-    EDGE_REQUEST_ORIGIN_FUNCTION_NAME:  string;
-    EDGE_RESPONSE_VIEWER_FUNCTION_NAME: string;
     DNS?:                               DNS;
     ORIGIN?:                            Origin;
     APP_LOGIN_HEADER:                   string;
     APP_LOGOUT_HEADER:                  string;
-    CLOUDFRONT_CHALLENGE_HEADER:        string;
     CLOUDFRONT_CACHING_STRATEGY?:       CloudFrontCachingStrategy;
     SHIBBOLETH:                         Shibboleth;
     TAGS:                               Tags;
@@ -59,7 +56,6 @@ export interface SecretFieldNames {
     samlCertSecretFld:            string;
     jwtPrivateKeySecretFld:       string;
     jwtPublicKeySecretFld:        string;
-    cloudfrontChallengeSecretFld: string;
 }
 
 export interface Secret extends SecretFieldNames {

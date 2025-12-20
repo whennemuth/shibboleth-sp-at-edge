@@ -3,6 +3,8 @@ import { SecretFieldNames } from "../../context/IContext";
 import { Keys } from 'shibboleth-sp';
 import { Key, KeyConfig } from "./Key";
 
+export const CLOUDFRONT_CHALLENGE_HEADER_NAME = 'cloudfront-challenge';
+
 /**
  * Class representing a secret in AWS Secrets Manager that holds Shibboleth and JWT keys/certificates.
  * Provides crud operations for the secret, and transformation of keys maintaining PEM formatting.
@@ -27,7 +29,7 @@ export class SecretsManagerSecret {
   }
 
   public setCloudFrontChallenge = (cloudFrontChallenge: string): SecretsManagerSecret => {
-    return this.setValue(this.parms.fldNames.cloudfrontChallengeSecretFld, cloudFrontChallenge);
+    return this.setValue(CLOUDFRONT_CHALLENGE_HEADER_NAME, cloudFrontChallenge);
   }
 
   public setJwtPrivateKeySecret = (jwtPrivateKey: string): SecretsManagerSecret => {

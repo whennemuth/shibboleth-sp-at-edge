@@ -16,7 +16,7 @@ This stack can be configured against two modes:
 1. **Standard**: This mode sets up a [cloudfront distribution](https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/distribution-overview.html) and a [cloudfront lambda@edge origin request function](https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/lambda-at-the-edge.html).
    You indicate this mode by setting the `ORIGIN.OriginType` value to `"alb"` in `./context/context.json`. It is assumed that your origin application is serviced by a [application load balancer](https://docs.aws.amazon.com/elasticloadbalancing/latest/application/introduction.html) and providing its [arn](https://docs.aws.amazon.com/IAM/latest/UserGuide/reference-arns.html) and [dns name](https://docs.aws.amazon.com/elasticloadbalancing/latest/userguide/how-elastic-load-balancing-works.html#request-routing) is enough to "point" the cloudfront distribution at it as an origin.
 2. **Demo:** This mode sets up the cloudfront distribution, lambda@edge origin request function, a "dummy" [lambda function](https://docs.aws.amazon.com/lambda/latest/dg/welcome.html), and a [function url](https://docs.aws.amazon.com/lambda/latest/dg/lambda-urls.html).
-   You indicate this mode by setting the `ORIGIN.OriginType` value to `"function-url"` in `./context/context.json` *(or omitting the `ORIGIN` property altogether)*. Make sure `EDGE_RESPONSE_VIEWER_FUNCTION_NAME` has a value.
+   You indicate this mode by setting the `ORIGIN.OriginType` value to `"function-url"` in `./context/context.json` *(or omitting the `ORIGIN` property altogether)*.
    The intent of this mode is to deploy to AWS all of the Shibboleth SP functionality in cloudfront AND an origin "application" for it to target. The simplest and most lightweight option for this is another lambda function. This follows AWS directions on ["Using a Lambda function URL"](https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/DownloadDistS3AndCustomOrigins.html#concept_lambda_function_url)
 
 #### Context fields:
@@ -24,8 +24,6 @@ This stack can be configured against two modes:
 - STACK_ID: Used as a baseline for naming the stack and resources.
 - ACCOUNT: The ID of the aws account you are deploying to.
 - REGION: The region you are deploying to.
-- EDGE_REQUEST_ORIGIN_FUNCTION_NAME: The name you choose for the [cloudfront lambda@edge origin request function](https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/lambda-at-the-edge.html).
-- EDGE_RESPONSE_VIEWER_FUNCTION_NAME: *("demo" setup only)* The name you choose for the [cloudfront lambda@edge viewer request function](https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/lambda-at-the-edge.html).
 - ORIGIN: Configurations that pertain to the [application load balancer](https://docs.aws.amazon.com/elasticloadbalancing/latest/application/introduction.html) you want to target as the origin for cloudfront. *SEE: ["Using an application load balancer"](https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/DownloadDistS3AndCustomOrigins.html#concept_elb_origin) and ["Restricting access to Application Load Balancers"](https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/restrict-access-to-load-balancer.html)*
   - dnsName: The [dns name](https://docs.aws.amazon.com/elasticloadbalancing/latest/userguide/how-elastic-load-balancing-works.html#request-routing) of the ALB targeted as the origin.
   - stackId: Indicates a unique identifier for the cloudfront origin that the lambda@edge functions intercept traffic for. This value will form part of the name of the cloudformation stack created when deploying this app.
@@ -38,13 +36,11 @@ This stack can be configured against two modes:
     - "false": The origin request function requires ALL incoming requests to show evidence of having authenticated with shibboleth before passing through to the origin.
 - APP_LOGIN_HEADER: The name of the http header that the origin application will reference for a value that indicates the redirect path for authentication. If a request to an app endpoint that needs to be private is missing an authentication token ([JWT](https://jwt.io/introduction)) the app will redirect to the path indicated by this header value.
 - APP_LOGOUT_HEADER: The name of the http header that the origin application will reference for a value that indicates the redirect path for logging off with shibboleth. This will accomplish wiping out any headers that were created by shibboleth and landing on a signout page. *(NOTE): The origin request lambda function will also invalidate the JWT created the user first authenticated.*
-- CLOUDFRONT_CHALLENGE_HEADER: In order to establish an ALB as an origin, it must be internet facing, and it must be carefully locked down. In addition to only responding to https traffic, two additional measures are taken, where CLOUDFRONT_CHALLENGE_HEADER pertains to the second:
-  1. The security group for the ALB must allow only ingress from Cloudfront IP address for the region of the distribution. A [Managed Prefix List](https://aws.amazon.com/blogs/networking-and-content-delivery/limit-access-to-your-origins-using-the-aws-managed-prefix-list-for-amazon-cloudfront/) for cloudfront is applied to the ALB security group as the only ingress rule.
-  2. With ingress to the ALB restricted to the cloudfront service, now it must be further restricted to the specific SAML SP distribution. This distribution is configured to add a "secret" header value to each request it forwards to the ALB origin. The ALB is configured with a listener rule that allows through only requests that have this header and that its value matches the expected value. This approach is a standard AWS practice and is detailed here: [Restricting access to Application Load Balancers](https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/restrict-access-to-load-balancer.html)
+
 - CLOUDFRONT_CACHING_STRATEGY: This value indicates the caching strategy that the cloudfront distribution should apply. Options are:
   - "no-cache": *default*, Cloudfront will not cache any content from the origin. Every request will be passed through to the origin.
-  - "standard": Cloudfront will apply its standard caching strategy.
-  - "bu-cache": Cloudfront will apply a caching strategy optimized for BU websites.
+  - "standard": Cloudfront will apply a typical caching strategy.
+  - "bu-cache": Cloudfront will apply a caching strategy customized for BU websites.
 - SHIBBOLETH:
   - entityId: The ID of your application service provider
   - idpCert: The public key as published by shibboleth at the IDP entity ID endpoint.
@@ -68,8 +64,6 @@ This stack can be configured against two modes:
   "STACK_ID": "shibsp",
   "ACCOUNT": "037860335094",
   "REGION": "us-east-2",
-  "EDGE_REQUEST_ORIGIN_FUNCTION_NAME": "SPFunctionOrigin",
-  "EDGE_RESPONSE_VIEWER_FUNCTION_NAME": "SPFunctionViewer",
   "ORIGIN": {
     "originType": "alb",
     "arn": "arn:aws:elasticloadbalancing:us-east-2:037860335094:loadbalancer/app/wp-wp-alb-questrom/ee233355a7e666a9",
@@ -85,7 +79,6 @@ This stack can be configured against two modes:
   } ,
   "APP_LOGIN_HEADER": "SHIB-HANDLER",
   "APP_LOGOUT_HEADER": "SHIB-IDP-LOGOUT",
-  "CLOUDFRONT_CHALLENGE_HEADER": "cloudfront-challenge",
   "SHIBBOLETH": {
     "entityId": "https://*.kualitest.research.bu.edu/shibboleth",
     "idpCert": "MIIDPDCCAiSgAwIBAgIVAJ6eiJuZK4QyWfKYUqfJdhx4wzkPMA0GCSqGSIb3DQEBBQUAMB8xHTAbBgNVBAMTFHdlYmxvZ2luLXRlc3QuYnUuZWR1MB4XDTEwMDkxNTE0Mjg0OFoXDTMwMDkxNTE0Mjg0OFowHzEdMBsGA1UEAxMUd2VibG9naW4tdGVzdC5idS5lZHUwggEiMA0GCSqGSIb3DQEBAQUAA4IBDwAwggEKAoIBAQCI5moQtXWSwpI/nt/fppWlIh4KDpF7AoetWTiSekjj6rQNIAVV1BiTGjvcPSsQzdEJZKpgO6tjMxPi8UiP8yXgcklzgsrHHGuIlQt6dwZNgS9IxkDnNTn8YqHoFoIm1v/po34qFERVzAo2n8SphHz3Pfp5BBH/Xc2q/IHxtBbSlhszx+2qYCzUuIVgONR+dN63ZmoRYoEakjosuTHxSqHxTXrPpE01FLCEfMXJlploh6ZrV96Y5pScMnn8ULr0Sgsq8x4qCDP2llEXRAsn/WWpzzmTFxGezzXgA2OQLeDMbq6SqmZ7E7dNEu244E9l1JnHLQBsPe9PXP/QEV7h+f/5AgMBAAGjbzBtMEwGA1UdEQRFMEOCFHdlYmxvZ2luLXRlc3QuYnUuZWR1hitodHRwczovL3dlYmxvZ2luLXRlc3QuYnUuZWR1L2lkcC9zaGliYm9sZXRoMB0GA1UdDgQWBBTPzLtx4wmThF7g6C3eCj6zw4tfszANBgkqhkiG9w0BAQUFAAOCAQEAC3lmttoHGXIHfEL75ViI8EyQD44J+bKIYTvbvQmBLS7Lw4iNgalmHnOgs5RBB5oIzOVWgeRUv0bwl48Gp4F9k7cXXDTwZRUxYc6kV9d/dEOCyOEDl4cDhsbM/TJJHPOVLhhPJXec07b3qxb4SaU/YP0ZiE+zD4FqikvZYkD20blmDIJbKPZvBlqfYZ0bBEdnKbWRH8uvFxgm1cz3+azzIWjqGXc7259shmJc391vNwva8SzJG9mUghTKGW1tdu3uoF6tIf/a3sUPxL+z0F0newS75gUl4ccWCjO4TuDgfyJEcjIZ0CYyIvzmtiWg7ZJxvG0zzYcx1ps3hT3nP38erw==",
