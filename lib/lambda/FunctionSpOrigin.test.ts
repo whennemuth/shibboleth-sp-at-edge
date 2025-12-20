@@ -18,7 +18,7 @@ enum SP_RETVAL_TYPE { response='wants_an_IResponse_back', request='wants_a_reque
  * Mock the behavior of Secret.ts (getting secrets from secret manager).
  */
 jest.mock('../secrets/Secret', () => {
-  const originalModule = jest.requireActual('../secret/Secret');
+  const originalModule = jest.requireActual('../secrets/Secret');
   if(process.env?.unmocked === 'true') {
     return originalModule;
   }
