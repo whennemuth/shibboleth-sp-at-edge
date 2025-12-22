@@ -8,7 +8,7 @@ import { CloudfrontDistribution } from '../lib/Distribution';
 import { createOrUpdateSecrets } from '../lib/secrets/SecretsManager';
 import { SecretsManagerSecret } from '../lib/secrets/Secret';
 import { albExists } from '../lib/OriginAlb';
-import { getClone } from '../lib/Util';
+import { getClone, getStackName } from '../lib/Util';
 import { findARecord } from '../lib/Route53';
 import { CustomResourceConfig } from 'aws-cdk-lib/custom-resources';
 import { RetentionDays } from 'aws-cdk-lib/aws-logs';
@@ -22,14 +22,6 @@ CustomResourceConfig.of(app).addLogRetentionLifetime(RetentionDays.ONE_WEEK);
 
 // Cast the context to the IContext type
 const _context = ctx as IContext;
-
-/**
- * @returns The name of the stack
- */
-export const getStackName = ():string => {
-  const { STACK_ID, TAGS: { Landscape } } = _context;
-  return `${STACK_ID}-${Landscape}`;
-}
 
 (async () => {
 
@@ -65,7 +57,7 @@ export const getStackName = ():string => {
 
   app.node.setContext('stack-parms', context);
 
-  const stackName = getStackName();
+  const stackName = getStackName(_context);
 
   const stack:Stack = new Stack(app, stackName, {
     stackName,

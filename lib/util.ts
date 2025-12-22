@@ -1,3 +1,5 @@
+import { IContext } from "../context/IContext";
+
 const isBlank = (s:string|null|undefined):boolean => {
   return s === undefined || s === null || `${s}`.trim() == '';
 }
@@ -17,3 +19,12 @@ export const instanceOf = <T>(value: any, fieldName: string): value is T => fiel
 export const getClone = <T>(obj:T):T => {
   return JSON.parse(JSON.stringify(obj)) as T;
 }
+
+/**
+ * @returns The name of the stack
+ */
+export const getStackName = (context:IContext):string => {
+  const { STACK_ID, TAGS: { Landscape } } = context;
+  return `${STACK_ID}-${Landscape}`;
+}
+

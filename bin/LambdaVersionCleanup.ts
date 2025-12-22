@@ -1,6 +1,5 @@
 import { CloudFrontClient, DistributionSummary, GetDistributionCommand, GetDistributionCommandOutput, ListDistributionsCommand, ListDistributionsResult, UpdateDistributionCommand, } from "@aws-sdk/client-cloudfront";
 import { DeleteFunctionCommand, LambdaClient, ListVersionsByFunctionCommand, ListVersionsByFunctionCommandOutput } from "@aws-sdk/client-lambda";
-import {} from '../lib/EdgeFunctionOriginRequest';
 import { EDGE_REQUEST_ORIGIN_FUNCTION_BASENAME } from '../lib/EdgeFunctionOriginRequest';
 import { EDGE_RESPONSE_VIEWER_FUNCTION_BASENAME } from '../lib/EdgeFunctionViewerResponse';
 import { IContext } from '../context/IContext';
@@ -53,12 +52,26 @@ export class Distribution {
       throw new Error('Distribution config lookup failure!')
     }
 
-    // 3) Modify the distribution to remove the edge lambda(s)
+    // 3) Modify the distribution to remove the edge lambda(s) from ALL behaviors
     console.log(`Removing lambda@edge function associations from distribution: ${Id}`);
+    
+    // Remove from default cache behavior
+    console.log('Removing lambda@edge function associations from default cache behavior');
     DistributionConfig.DefaultCacheBehavior.LambdaFunctionAssociations = {
       Quantity: 0,
       Items: []
     };
+    
+    // Remove from all additional cache behaviors
+    if (DistributionConfig.CacheBehaviors?.Items) {
+      DistributionConfig.CacheBehaviors.Items.forEach(behavior => {
+        console.log(`Removing lambda@edge function associations from cache behavior: ${behavior.PathPattern}`);
+        behavior.LambdaFunctionAssociations = {
+          Quantity: 0,
+          Items: []
+        };
+      });
+    }
     const updateCommand = new UpdateDistributionCommand({ Id, DistributionConfig, IfMatch: output.ETag });
     await cloudFrontClient.send(updateCommand);
   }
@@ -97,7 +110,8 @@ export class Lambda {
       catch(e:any) {
         if(e.name && e.name == 'ResourceNotFoundException') {
           this._functionExists = false;
-          console.log(`No such function ${name} in region ${region.name}`);
+          const regionName = await region();
+          console.log(`No such function ${name} in region ${regionName}`);
         }
         else {
           throw(e);
@@ -220,7 +234,7 @@ const deleteVersions = async (functionList:string) => {
   // 3) Delete all prior versions of every lambda@edge function (leaving only current version).
   if(functionArray.length > 0) {
     const lambdaClientDefaultRegion = new LambdaClient();
-    const defaultRegion = lambdaClientDefaultRegion.config.region.name;
+    const defaultRegion = await lambdaClientDefaultRegion.config.region();
     const lambdaClientUsEast1 = new LambdaClient({ region: 'us-east-1' });
     for(var i=0; i<functionArray.length; i++) {
       const functionName = functionArray[i].trim();
@@ -244,7 +258,7 @@ deleteVersions(
   ${STACK_ID}-${Landscape}-${EDGE_RESPONSE_VIEWER_FUNCTION_BASENAME}, \
   ${STACK_ID}-${Landscape}-app-function`
 ).then(() => {
-  console.log('Completed. Wait an hour or two for cloudfront to delete its replicas before deleting the stack.');
+  console.log('Completed. You should now be able to delete the stack.');
 }).catch(e => {
   console.log(JSON.stringify(e, Object.getOwnPropertyNames(e), 2));
 });

@@ -9,7 +9,11 @@ import { Distribution } from "aws-cdk-lib/aws-cloudfront";
 import { ARecord, ARecordProps, HostedZone, RecordTarget, } from "aws-cdk-lib/aws-route53";
 import { CloudFrontTarget } from "aws-cdk-lib/aws-route53-targets";
 import { Construct } from "constructs";
-import { getStackName } from "../bin/App";
+import { IContext } from '../context/IContext';
+import * as ctx from '../context/context.json';
+import { getStackName } from "./Util";
+
+const context = ctx as IContext;
 
 export type CreateARecordParameters = {
   scope: Construct,
@@ -24,7 +28,7 @@ export type CreateARecordParameters = {
  * @returns The breadcrumb comment
  */
 const getBreadCrumb = ():string => {
-  const stackName = getStackName();
+  const stackName = getStackName(context);
   return `CREATED_BY: ${stackName}`;
 }
 
@@ -88,7 +92,7 @@ export const findARecord = async (hostedZoneName: string, recordName: string, re
     }
 
     // Step 4: Check if this record was created by this stack
-    const stackName = getStackName();
+    const stackName = getStackName(context);
     const createdByThisStack = aRecord.ResourceRecords?.some(record => 
       record.Value?.includes(getBreadCrumb())
     ) || false;
