@@ -24,8 +24,8 @@
     "entryPoint": "https://shib-test.bu.edu/idp/profile/SAML2/Redirect/SSO",
     "logoutUrl": "https://shib-test.bu.edu/idp/logout.jsp",    
     "secret": {
-      "_secretArn": "arn:aws:secretsmanager:us-east-2:037860335094:secret:shibsp/wp/devl2-1nUwF9",
-      "_refreshInterval": "3600000",
+      "secretArn": "arn:aws:secretsmanager:us-east-2:037860335094:secret:shibsp/wp/devl2-1nUwF9",
+      "refreshInterval": "3600000",
       "samlPrivateKeySecretFld": "wp-sp-key",
       "samlCertSecretFld": "wp-sp-cert",
       "jwtPrivateKeySecretFld": "wp-jwt-prikey",

@@ -1,6 +1,7 @@
 import { SecretsManagerSecret } from "./Secret";
 import * as contextJSON from '../../context/context.json';
 import { IContext } from "../../context/IContext";
+import { CreateSecretCommandOutput, UpdateSecretCommandOutput } from "@aws-sdk/client-secrets-manager";
 
 /**
  * Script to create or update the secrets for this stack in AWS Secrets Manager.
@@ -9,7 +10,7 @@ import { IContext } from "../../context/IContext";
  * NOTE: Since this module is not being called as part of the CDK app, it is independent of it.
  * The goal here is to make secrets that survive stack deletion.
  */
-export const createOrUpdateSecrets = async () => {
+export const createOrUpdateSecrets = async (): Promise<string> => {
   const context = contextJSON as IContext;
 
   const { STACK_ID, ORIGIN: { stackId: ORIGIN_STACK_ID } = {}, REGION, TAGS: { Landscape }, SHIBBOLETH: { entityId, idpCert, secret: { 
@@ -48,5 +49,18 @@ export const createOrUpdateSecrets = async () => {
 
   console.log(`Creating or updating secret: ${secretName}: ${await smSecret.getSecretValueJson() }`);
 
-  await smSecret.save();
+  // Check if secret exists before saving to determine operation type
+  const secretExists = await smSecret.exists();
+  const result:CreateSecretCommandOutput|UpdateSecretCommandOutput = await smSecret.save();
+
+  // Now we know what operation was performed
+  const operation = secretExists ? 'UPDATED' : 'CREATED';
+  console.log(`${operation} secret: ${result.ARN || result.Name}`);
+  console.log(`Secret ARN: ${result.ARN}`);
+
+  if( ! result.ARN ) {
+    throw new Error('Secret ARN not returned after create or update operation');
+  }
+  
+  return result.ARN;
 };

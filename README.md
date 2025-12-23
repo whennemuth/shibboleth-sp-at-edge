@@ -44,7 +44,7 @@ A more detailed view of the interaction between the end-user, origin request lam
 2. Set the values for the [Runtime Context](https://docs.aws.amazon.com/cdk/v2/guide/context.html) by modifying the `./context/context.json` file accordingly.
    Most fields in `./context/context.json` are self-explanatory, but any additional explanation that might be needed can be found [here](./context/README.md).
    
-2. Set the two secret values to complement the [Runtime Context](https://docs.aws.amazon.com/cdk/v2/guide/context.html) in a `./.env` file:
+2. Set the three secret values to complement the [Runtime Context](https://docs.aws.amazon.com/cdk/v2/guide/context.html) in a `./.env` file:
    
    - CLOUDFRONT_CHALLENGE_HEADER: In order to establish an ALB as an origin, it must be internet facing, and it must be carefully locked down. In addition to only responding to https traffic, two additional measures are taken, where CLOUDFRONT_CHALLENGE_HEADER pertains to the second:
      1. The security group for the ALB must allow only ingress from Cloudfront IP address for the region of the distribution. A [Managed Prefix List](https://aws.amazon.com/blogs/networking-and-content-delivery/limit-access-to-your-origins-using-the-aws-managed-prefix-list-for-amazon-cloudfront/) for cloudfront is applied to the ALB security group as the only ingress rule.

@@ -50,8 +50,8 @@ This stack can be configured against two modes:
   - logoutUrl: The "SLO" value as documented by the techweb [Configuration Information for Application Admins](https://www.bu.edu/tech/services/security/iam/authentication/shibboleth/configuration/) page. This is the url redirected to by  your app for logging out with shibboleth
   - secret:
     All the private keys and certs are stored in secrets manager
-    - _secretArn: The AWS [ARN](https://docs.aws.amazon.com/IAM/latest/UserGuide/reference-arns.html) of the [secrets manager](https://docs.aws.amazon.com/secretsmanager/latest/userguide/intro.html) secret where the private keys and certs are stored.
-    - _refreshInterval: The lambda@edge origin request function caches the secret to avoid having to perform a secrets manager lookup for each request. This cache is refreshed at an interval specified by this value in milliseconds.
+    - secretArn: The AWS [ARN](https://docs.aws.amazon.com/IAM/latest/UserGuide/reference-arns.html) of the [secrets manager](https://docs.aws.amazon.com/secretsmanager/latest/userguide/intro.html) secret where the private keys and certs are stored.
+    - refreshInterval: The lambda@edge origin request function caches the secret to avoid having to perform a secrets manager lookup for each request. This cache is refreshed at an interval specified by this value in milliseconds.
     - samlCertSecretFld: The [Service Provider Checklist](https://www.bu.edu/tech/services/security/iam/authentication/shibboleth/service-provider-checklist/) techweb form requires you to provide a "Service Provider Metadata" xml file to register your app as a service provider with shibboleth. Shibboleth requires a public portion of a certificate keypair to be provided in this file at `<md:EntityDescriptor>.<md:SPSSODescriptor>.<md:KeyDescriptor>.<ds:KeyInfo>.<ds:X509Data>.<ds:X509Certificate>`. This field is that public certificate value.
     - samlPrivateKeySecretFld: This is the private key that matches the samlCertSecretFld certificate.
     - jwtPublicKeySecretFld: This is the public portion of a RSA keypair. It is used in signing the [JSON web token (JWT)](https://jwt.io/introduction) by the Lambda@edge origin request function. [Example for generating this key](https://www.npmjs.com/package/node-forge#rsa)
@@ -85,8 +85,8 @@ This stack can be configured against two modes:
     "entryPoint": "https://shib-test.bu.edu/idp/profile/SAML2/Redirect/SSO",
     "logoutUrl": "https://shib-test.bu.edu/idp/logout.jsp",    
     "secret": {
-      "_secretArn": "arn:aws:secretsmanager:us-east-2:037860335094:secret:dev/wp/shib-sp-test-JML3FN",
-      "_refreshInterval": "3600000",
+      "secretArn": "arn:aws:secretsmanager:us-east-2:037860335094:secret:dev/wp/shib-sp-test-JML3FN",
+      "refreshInterval": "3600000",
       "samlPrivateKeySecretFld": "wp-sp-key",
       "samlCertSecretFld": "wp-sp-cert",
       "jwtPrivateKeySecretFld": "wp-jwt-prikey",

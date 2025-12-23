@@ -1,17 +1,16 @@
 #!/usr/bin/env node
 import { App, RemovalPolicy, Stack } from 'aws-cdk-lib';
+import { RetentionDays } from 'aws-cdk-lib/aws-logs';
+import { CustomResourceConfig } from 'aws-cdk-lib/custom-resources';
 import { BuildOptions, build } from 'esbuild';
 import 'source-map-support/register';
 import { IContext, OriginAlb, OriginType, SecretFieldNames } from '../context/IContext';
 import * as ctx from '../context/context.json';
 import { CloudfrontDistribution } from '../lib/Distribution';
-import { createOrUpdateSecrets } from '../lib/secrets/SecretsManager';
-import { SecretsManagerSecret } from '../lib/secrets/Secret';
 import { albExists } from '../lib/OriginAlb';
-import { getClone, getStackName } from '../lib/Util';
 import { findARecord } from '../lib/Route53';
-import { CustomResourceConfig } from 'aws-cdk-lib/custom-resources';
-import { RetentionDays } from 'aws-cdk-lib/aws-logs';
+import { getClone, getStackName, logHeader } from '../lib/Util';
+import { SecretsManagerSecret } from '../lib/secrets/Secret';
 
 // Instatiate the app
 const app = new App();
@@ -30,7 +29,7 @@ const _context = ctx as IContext;
 
   const { 
     ACCOUNT:account, REGION:region,
-    SHIBBOLETH: { secret: { _secretArn } },
+    SHIBBOLETH: { secret: { secretArn } },
     ORIGIN, ORIGIN: { subdomain } = {},
     DNS: { hostedZone } = {},
     TAGS: { Landscape, Function, Service }
@@ -72,20 +71,29 @@ const _context = ctx as IContext;
     stack.tags.setTag(key, value);
   }
   
-  if( _secretArn ) {
+  // Make sure the secret arn is included in the context and that the secret exists.
+  if( secretArn ) {
     // Make sure it exists.
     const exists = await new SecretsManagerSecret({ 
-      secretName: _secretArn, fldNames: {} as SecretFieldNames, region 
+      secretName: secretArn, fldNames: {} as SecretFieldNames, region 
     }).exists();
 
     // Abort if the specified secret does not exist
     if( ! exists ) {
-      throw new Error(`The secret with ARN ${_secretArn} does not exist`);
+      logHeader('VALIDATION ERROR!!!')
+      console.error(`The secret ${secretArn} does not exist. ` +
+        `\nYou can create it by populating the ./.env file as directed in the README and running: ` +
+        `\nnpm run create-secrets`);
+      process.exit(1);
     }
   }
   else {
-    // Generate and upload the secrets to secrets manager
-    await createOrUpdateSecrets();
+    logHeader('VALIDATION ERROR!!!')
+    console.error(`SHIBBOLETH.secret.secretArn must be defined in ./context/context.json. ` +
+      `\nIf this is because the secret does not exist in secrets manager yet, you can create it by populating ` +
+      `\nthe ./.env file as directed in the README and running ` +
+      `\nnpm run create-secrets`);
+    process.exit(1);
   }
 
   // Check the region

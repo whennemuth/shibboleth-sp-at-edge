@@ -28,3 +28,9 @@ export const getStackName = (context:IContext):string => {
   return `${STACK_ID}-${Landscape}`;
 }
 
+export const logHeader = (header:string) => {
+  const spacer = ' '.repeat((80 - header.length) / 2);
+  console.log('\n' + '='.repeat(80));
+  console.log(`${spacer}${header}`);
+  console.log('='.repeat(80));
+}

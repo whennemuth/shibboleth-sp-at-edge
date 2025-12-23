@@ -3,8 +3,8 @@ import * as context from '../../context/context.json';
 import { Secret } from '../../context/IContext';
 import { CLOUDFRONT_CHALLENGE_HEADER_NAME } from "../secrets/Secret";
 
-const { _secretArn, _refreshInterval, samlCertSecretFld, samlPrivateKeySecretFld, jwtPublicKeySecretFld, jwtPrivateKeySecretFld } = context.SHIBBOLETH.secret as Secret;
-const refreshInterval = parseInt(_refreshInterval)
+const { secretArn, refreshInterval, samlCertSecretFld, samlPrivateKeySecretFld, jwtPublicKeySecretFld, jwtPrivateKeySecretFld } = context.SHIBBOLETH.secret as Secret;
+const refreshIntervalInt = parseInt(refreshInterval)
 
 export type CachedKeys = {
   _timestamp: number;
@@ -16,8 +16,8 @@ export type CachedKeys = {
 }
 
 export type SecretsConfig = {
-  _secretArn:string;
-  _refreshInterval:string;
+  secretArn:string;
+  refreshInterval:string;
   samlCertSecretFld:string;
   samlPrivateKeySecretFld:string;
   jwtPublicKeySecretFld:string;
@@ -52,8 +52,8 @@ export const requiresRefreshFromSecretsManager = (cache:CachedKeys, refreshInter
 export async function checkCache(cache:CachedKeys, config?:SecretsConfig): Promise<void> {
   // If a cache configuration is not supplied, get it from the context instead.
   const _config = config || {
-    refreshInterval, 
-    _secretArn, 
+    refreshInterval: refreshIntervalInt, 
+    secretArn, 
     jwtPrivateKeySecretFld, 
     jwtPublicKeySecretFld, 
     samlCertSecretFld, 
@@ -62,18 +62,18 @@ export async function checkCache(cache:CachedKeys, config?:SecretsConfig): Promi
   };
   
   const now = Date.now();
-  if (requiresRefreshFromSecretsManager(cache, refreshInterval, now)) {
+  if (requiresRefreshFromSecretsManager(cache, refreshIntervalInt, now)) {
     try {
       const { 
-        _secretArn, 
+        secretArn, 
         samlCertSecretFld, 
         samlPrivateKeySecretFld, 
         jwtPrivateKeySecretFld, 
         jwtPublicKeySecretFld, 
         cloudfrontChallengeSecretFld 
       } = _config;
-      const command = new GetSecretValueCommand({ SecretId: _secretArn });
-      const region = _secretArn.split(':')[3];
+      const command = new GetSecretValueCommand({ SecretId: secretArn });
+      const region = secretArn.split(':')[3];
       const secretsClient = new SecretsManagerClient({ region });
       const response:GetSecretValueCommandOutput = await secretsClient.send(command);
       if( ! response.SecretString) {

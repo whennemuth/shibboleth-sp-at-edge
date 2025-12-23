@@ -59,8 +59,8 @@ export interface SecretFieldNames {
 }
 
 export interface Secret extends SecretFieldNames {
-    _secretArn:                   string;
-    _refreshInterval:             string;
+    secretArn:                   string;
+    refreshInterval:             string;
 }
 
 export interface Tags {
