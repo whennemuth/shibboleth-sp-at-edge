@@ -99,11 +99,19 @@ export class CloudfrontDistribution extends Construct {
         value: `https://${subdomain}`,
         description: 'CloudFront Distribution URL',
       });
+      new CfnOutput(stack, 'TestOriginURL', {
+        value: `https://${subdomain}/testing123`,
+        description: 'CloudFront Test Origin URL',
+      });
     }
     else {
       new CfnOutput(stack, 'CloudFrontDistributionURL', {
         value: `https://${this.cloudFrontDistribution.distributionDomainName}`,
         description: 'CloudFront Distribution URL',
+      });
+      new CfnOutput(stack, 'TestOriginURL', {
+        value: `https://${this.cloudFrontDistribution.distributionDomainName}/testing123`,
+        description: 'CloudFront Test Origin URL',
       });
     }
   }
