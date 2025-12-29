@@ -28,6 +28,12 @@ export const getStackName = (context:IContext):string => {
   return `${STACK_ID}-${Landscape}`;
 }
 
+export const echoStackName = () => {
+  const contextModule = require('../context/context.json') as IContext;
+  const stackName = getStackName(contextModule);
+  console.log(stackName);
+}
+
 export const logHeader = (header:string) => {
   const spacer = ' '.repeat((80 - header.length) / 2);
   console.log('\n' + '='.repeat(80));

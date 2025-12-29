@@ -15,7 +15,8 @@
     "cdk": "cdk",
     "deploy": "cdk deploy --all --no-rollback --require-approval never",
     "redeploy": "cdk destroy --all -f && npm run deploy --all",
-    "synth": "cdk synth shibsp-questrom 2>&1 | tee cdk.out/synth.output.yaml"
+    "get-stack-name": "ts-node -e \"require('./lib/Util.ts').echoStackName()\"",
+    "synth": "npm run get-stack-name | xargs cdk synth 2>&1 | tee cdk.out/synth.output.yaml"
   },
   "dependencies": {
     "@aws-sdk/client-secrets-manager": "^3.577.0",
