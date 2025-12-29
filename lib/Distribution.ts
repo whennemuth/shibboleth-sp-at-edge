@@ -11,7 +11,7 @@ import { createEdgeFunctionForViewerResponse } from './EdgeFunctionViewerRespons
 import { getAlbOrigin } from './OriginAlb';
 import { getFunctionUrlOrigin } from './OriginFunctionUrl';
 import { createARecord } from './Route53';
-import { ParameterTester } from './Util';
+import { getStackName, ParameterTester } from './Util';
 import path = require('path');
 
 /**
@@ -30,6 +30,7 @@ export class CloudfrontDistribution extends Construct {
   private origin:OriginBase;
   private testOrigin:OriginBase;
   private cloudFrontDistribution:Distribution;
+  private buCachePolicy:CachePolicy|undefined;
 
   constructor(stack: Construct, stackName: string, props?: { ignoreRoute53: boolean }) {
     
@@ -171,6 +172,17 @@ export class CloudfrontDistribution extends Construct {
 
     const customDomain = ():boolean => subdomains.length > 0;
 
+    // Create BU Cache Policy if needed
+    if (context.CLOUDFRONT_CACHING_STRATEGY === CloudFrontCachingStrategy.BU_CACHE) {
+      this.buCachePolicy = new CachePolicy(this, `${getStackName(context)}-BUCachePolicy`, {
+        cachePolicyName: `BU-Cache-Policy-${TAGS.Landscape}`,
+        comment: 'Cache policy matching distributions involved with web-router',
+        cookieBehavior: CacheCookieBehavior.all(),
+        headerBehavior: CacheHeaderBehavior.allowList('Host', 'Referer', 'User-Agent', 'X-Upstream'),
+        queryStringBehavior: CacheQueryStringBehavior.all()
+      } as CachePolicyProps);
+    }
+
     /**
      * Construct a behavior for the provided origin
      * @param origin 
@@ -183,16 +195,24 @@ export class CloudfrontDistribution extends Construct {
       const { ALLOW_ALL, REDIRECT_TO_HTTPS } = ViewerProtocolPolicy;
       const { ALL_VIEWER, ALL_VIEWER_EXCEPT_HOST_HEADER } = OriginRequestPolicy
 
+      const cachePolicy: CloudFrontCachingStrategy = (origin instanceof HttpOrigin) ?
+        NO_CACHE : // function url
+        CLOUDFRONT_CACHING_STRATEGY; // alb
+
       const behaviorOptions = {
         origin,
         edgeLambdas,
         allowedMethods: AllowedMethods.ALLOW_ALL,
         cachedMethods: AllowedMethods.ALLOW_GET_HEAD_OPTIONS,
         viewerProtocolPolicy: customDomain ? REDIRECT_TO_HTTPS : ALLOW_ALL,
-        originRequestPolicy: customDomain ? ALL_VIEWER : ALL_VIEWER_EXCEPT_HOST_HEADER, // See NOTE 2        
+        originRequestPolicy: customDomain ? (
+          (origin instanceof HttpOrigin) ? 
+            ALL_VIEWER_EXCEPT_HOST_HEADER /** function url */ : 
+            ALL_VIEWER /** alb */
+        ) : ALL_VIEWER_EXCEPT_HOST_HEADER, // See NOTE 2        
       } as BehaviorOptions;
 
-      switch(CLOUDFRONT_CACHING_STRATEGY) {
+      switch(cachePolicy) {
         case STANDARD:
           /**
            * NOTE: You would not want to use this if WordPress is the origin. WordPress needs to
@@ -215,13 +235,7 @@ export class CloudfrontDistribution extends Construct {
            */
           return {
             ...behaviorOptions,
-            cachePolicy: new CachePolicy(this, 'BUCachePolicy', {
-              cachePolicyName: 'BU-Cache-Policy',
-              comment: 'Cache policy matching distributions involved with web-router',
-              cookieBehavior: CacheCookieBehavior.all(), // Forward all cookies in cache key
-              headerBehavior: CacheHeaderBehavior.allowList('Host', 'Referer', 'User-Agent', 'X-Upstream'),
-              queryStringBehavior: CacheQueryStringBehavior.all() // Forward all query strings in cache key
-            } as CachePolicyProps)
+            cachePolicy: this.buCachePolicy
           } as BehaviorOptions;
         case NO_CACHE:
           /**
