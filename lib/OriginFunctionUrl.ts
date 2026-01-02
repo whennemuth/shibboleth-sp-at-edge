@@ -4,7 +4,8 @@ import { HttpOrigin, HttpOriginProps } from "aws-cdk-lib/aws-cloudfront-origins"
 import { FunctionUrl, FunctionUrlAuthType, Runtime } from "aws-cdk-lib/aws-lambda";
 import { NodejsFunction } from "aws-cdk-lib/aws-lambda-nodejs";
 import { Construct } from "constructs";
-import { IContext, OriginFunctionUrl } from "../context/IContext";
+import { IContext, OriginFunctionUrl, OriginType } from "../context/IContext";
+import { HttpOriginBase } from "./Origin";
 
 export type OriginFunctionUrlConfig = {
   origin:OriginFunctionUrl,
@@ -13,12 +14,15 @@ export type OriginFunctionUrlConfig = {
   edgeFunctionForOriginRequest:NodejsFunction|undefined
 }
 
-export const getFunctionUrlOrigin = (config:OriginFunctionUrlConfig):HttpOrigin  => {
+export const getFunctionUrlOrigin = (config:OriginFunctionUrlConfig): HttpOriginBase  => {
   const { origin } = config;
   if(origin.url) {
     throw new Error('Existing function url as origin not implemented yet.');
   }
-  return getDummyLambdaAppOrigin(config);
+  return { 
+    httpOrigin: getDummyLambdaAppOrigin(config), 
+    originType: OriginType.FUNCTION_URL 
+  };
 }
 
 /**

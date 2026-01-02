@@ -1,7 +1,6 @@
-import { CfnOutput, RemovalPolicy, Duration } from 'aws-cdk-lib';
+import { CfnOutput, Duration, RemovalPolicy } from 'aws-cdk-lib';
 import { Certificate, ICertificate } from 'aws-cdk-lib/aws-certificatemanager';
-import { AllowedMethods, BehaviorOptions, CachePolicy, CachePolicyProps, CacheHeaderBehavior, CacheCookieBehavior, CacheQueryStringBehavior, Distribution, DistributionProps, EdgeLambda, OriginBase, OriginRequestPolicy, PriceClass, ViewerProtocolPolicy } from 'aws-cdk-lib/aws-cloudfront';
-import { HttpOrigin } from 'aws-cdk-lib/aws-cloudfront-origins';
+import { AllowedMethods, BehaviorOptions, CacheCookieBehavior, CacheHeaderBehavior, CachePolicy, CachePolicyProps, CacheQueryStringBehavior, Distribution, DistributionProps, EdgeLambda, OriginRequestPolicy, PriceClass, ViewerProtocolPolicy } from 'aws-cdk-lib/aws-cloudfront';
 import { NodejsFunction } from 'aws-cdk-lib/aws-lambda-nodejs';
 import { Bucket, ObjectOwnership } from 'aws-cdk-lib/aws-s3';
 import { Construct } from 'constructs';
@@ -30,8 +29,8 @@ export class CloudfrontDistribution extends Construct {
   private context:IContext;
   private edgeFunctionForOriginRequest:NodejsFunction|undefined;
   private edgeLambdas = [] as EdgeLambda[];
-  private origin:OriginBase;
-  private testOrigin:OriginBase;
+  private origin:HttpOriginBase;
+  private testOrigin:HttpOriginBase;
   private cloudFrontDistribution:Distribution;
   private buCachePolicy:CachePolicy|undefined;
 
@@ -74,7 +73,7 @@ export class CloudfrontDistribution extends Construct {
       case OriginType.FUNCTION_URL:
         this.origin = getFunctionUrlOrigin({
           stack, context, edgeFunctionForOriginRequest, origin:(ORIGIN as OriginFunctionUrl)
-        }) as HttpOrigin;
+        });
         break;
       default:
         console.log('ORIGIN is not defined, using function url as test origin');
@@ -161,8 +160,10 @@ export class CloudfrontDistribution extends Construct {
    * Create the cloudfront distribution.
    * 
    * NOTE 1: VIEWER_REQUEST event type would have been preferable so that the edge lambda is hit despite what's in
-   * the cache. However, that means a 1 MB code limit, which seems to be exceeded, making ORIGIN_REQUEST the
-   * only choice with a 50 MB code limit. In order for the lambda get hit for EVERY request, caching is disabled.
+   * the cache. However, that means a 1 MB code limit, which can be exceeded, making ORIGIN_REQUEST the better
+   * choice with a 50 MB code limit. In order for the lambda to get hit for EVERY request, caching is disabled,
+   * or fragmented sufficiently to avoid cache hits, like the Boston University WordPress caching strategy, where
+   * all cookies and query strings are used to form the cache key.
    * 
    * NOTE 2: ALL_VIEWER_EXCEPT_HOST_HEADER will ensure the HTTP_HOST header contains the origins host domain, 
    * not the domain of the cloudfront distribution. This keeps lambda function url origins working correctly,
@@ -202,24 +203,26 @@ export class CloudfrontDistribution extends Construct {
      * @param customDomain 
      * @returns 
      */
-    const getBehavior = (origin:OriginBase, customDomain:boolean):BehaviorOptions => {
+    const getBehavior = (origin:HttpOriginBase, customDomain:boolean, forceNoCache:boolean = false):BehaviorOptions => {
       const { STANDARD, BU_CACHE, NO_CACHE } = CloudFrontCachingStrategy;
       const { context: { CLOUDFRONT_CACHING_STRATEGY=NO_CACHE } } = this;
       const { ALLOW_ALL, REDIRECT_TO_HTTPS } = ViewerProtocolPolicy;
       const { ALL_VIEWER, ALL_VIEWER_EXCEPT_HOST_HEADER } = OriginRequestPolicy
 
-      const cachePolicy: CloudFrontCachingStrategy = (origin instanceof HttpOrigin) ?
-        NO_CACHE : // function url
+      const isFunctionUrlOrigin = origin.originType == OriginType.FUNCTION_URL;
+
+      const cachePolicy: CloudFrontCachingStrategy = forceNoCache || isFunctionUrlOrigin ?
+        NO_CACHE : // function url or forced no cache
         CLOUDFRONT_CACHING_STRATEGY; // alb
 
       const behaviorOptions = {
-        origin,
+        origin: origin.httpOrigin,
         edgeLambdas,
         allowedMethods: AllowedMethods.ALLOW_ALL,
         cachedMethods: AllowedMethods.ALLOW_GET_HEAD_OPTIONS,
         viewerProtocolPolicy: customDomain ? REDIRECT_TO_HTTPS : ALLOW_ALL,
         originRequestPolicy: customDomain ? (
-          (origin instanceof HttpOrigin) ? 
+          isFunctionUrlOrigin ? 
             ALL_VIEWER_EXCEPT_HOST_HEADER /** function url */ : 
             ALL_VIEWER /** alb */
         ) : ALL_VIEWER_EXCEPT_HOST_HEADER, // See NOTE 2        
@@ -288,11 +291,12 @@ export class CloudfrontDistribution extends Construct {
 
     if(origin) {
       // Associate the test origin with an additional behavior
+      // Test origins are always function URLs and should always use NO_CACHE
       distributionProps = Object.assign({
         additionalBehaviors: {
           // https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/distribution-web-values-specify.html#DownloadDistValuesPathPattern
-          '/testing123': getBehavior(testOrigin, false),
-          '/testing123/*': getBehavior(testOrigin, false)
+          '/testing123': getBehavior(testOrigin, false, true),
+          '/testing123/*': getBehavior(testOrigin, false, true),
         }
       }, distributionProps);
     }

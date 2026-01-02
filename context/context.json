@@ -5,16 +5,16 @@
   "ORIGIN": {
     "originType": "alb",
     "stackId": "wp",
-    "dnsName": "wp-wp-alb-devl2-542475253.us-east-2.elb.amazonaws.com",
+    "dnsName": "wp-wp-alb-devl1-545432521.us-east-2.elb.amazonaws.com",
     "httpPort": 80,
     "httpsPort": 443,
-    "subdomain": "wp2.warhen.work",
+    "subdomain": "wp1.warhen.work",
     "appAuthorization": true
   }, 
   "DNS": {
     "hostedZone": "warhen.work",
     "certificateARN": "arn:aws:acm:us-east-1:037860335094:certificate/47aadc38-fe33-4519-932a-10c6ababaccc"
-  } ,
+  },
   "APP_LOGIN_HEADER": "SHIB-HANDLER",
   "APP_LOGOUT_HEADER": "SHIB-IDP-LOGOUT",
   "CLOUDFRONT_CACHING_STRATEGY": "bu-cache",
@@ -24,7 +24,7 @@
     "entryPoint": "https://shib-test.bu.edu/idp/profile/SAML2/Redirect/SSO",
     "logoutUrl": "https://shib-test.bu.edu/idp/logout.jsp",    
     "secret": {
-      "secretArn": "arn:aws:secretsmanager:us-east-2:037860335094:secret:shibsp/wp/devl2-1nUwF9",
+      "secretArn": "arn:aws:secretsmanager:us-east-2:037860335094:secret:shibsp/wp/devl-0GlFcY",
       "refreshInterval": "3600000",
       "samlPrivateKeySecretFld": "wp-sp-key",
       "samlCertSecretFld": "wp-sp-cert",
@@ -35,6 +35,6 @@
   "TAGS": {
     "Service": "websites",
     "Function": "wordpress",
-    "Landscape": "devl2"
+    "Landscape": "devl1"
   }
 }

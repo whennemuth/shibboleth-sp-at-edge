@@ -4,7 +4,7 @@ import { RetentionDays } from 'aws-cdk-lib/aws-logs';
 import { CustomResourceConfig } from 'aws-cdk-lib/custom-resources';
 import { BuildOptions, build } from 'esbuild';
 import 'source-map-support/register';
-import { IContext, OriginAlb, OriginType, SecretFieldNames } from '../context/IContext';
+import { CloudFrontCachingStrategy, IContext, OriginAlb, OriginType, SecretFieldNames } from '../context/IContext';
 import * as ctx from '../context/context.json';
 import { CloudfrontDistribution } from '../lib/Distribution';
 import { albExists } from '../lib/OriginAlb';
@@ -38,11 +38,15 @@ const _context = ctx as IContext;
   const dnsName = (ORIGIN as OriginAlb)?.dnsName;
 
   const missingAlb = ! (await albExists({ dnsName, region }));
+  console.log(`ALB with DNS name ${dnsName} exists: ${!missingAlb}`);
 
-  if( missingAlb && ORIGIN && ORIGIN.originType == OriginType.ALB ) {
+  if( missingAlb && ORIGIN && `${ORIGIN.originType}`.toLowerCase() == OriginType.ALB ) {
     // Use a function URL as an origin. This could mean the ALB is still intended to be used,
     // but the stack in which the ALB is created has not been deployed yet.
+    console.warn(`NOTICE: The ALB with DNS name ${dnsName} does not exist in region ${region}. ` +
+      `\nSwitching the origin type to Function URL temporarily.`);
     context.ORIGIN!.originType = OriginType.FUNCTION_URL;
+    context.CLOUDFRONT_CACHING_STRATEGY = CloudFrontCachingStrategy.NO_CACHE;
   }
 
   // Find out if an A record for the subdomain already exists AND was not created by this stack.
