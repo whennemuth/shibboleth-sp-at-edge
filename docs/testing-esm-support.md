@@ -34,7 +34,7 @@ The following [jest documentation](https://jestjs.io/docs/ecmascript-modules) wa
           "--runTestsByPath", 
           "--silent",
           "-i", 
-          "${workspaceFolder}/lib/lambda/FunctionSpOrigin.test.ts" 
+          "${workspaceFolder}/lib/lambda/FunctionSpOriginRequest.test.ts" 
         ],
         "runtimeArgs": [ "--experimental-vm-modules" ],
         "console": "integratedTerminal",

@@ -8,6 +8,8 @@ import { Construct } from 'constructs';
 import { CloudFrontCachingStrategy, IContext, Origin, OriginAlb, OriginFunctionUrl, OriginType } from '../context/IContext';
 import { createEdgeFunctionForOriginRequest } from './EdgeFunctionOriginRequest';
 import { createEdgeFunctionForViewerResponse } from './EdgeFunctionViewerResponse';
+import { createEdgeFunctionForViewerRequest } from './EdgeFunctionViewerRequest';
+import { HttpOriginBase } from './Origin';
 import { getAlbOrigin } from './OriginAlb';
 import { getFunctionUrlOrigin } from './OriginFunctionUrl';
 import { createARecord } from './Route53';
@@ -19,9 +21,10 @@ import path = require('path');
  * it needs. Thus, all stack resources are accounted for here. 
  */
 export class CloudfrontDistribution extends Construct {
-  // The path of the origin request edge lambda code asset relative to the root of the project
-  public static EDGE_ORIGIN_REQUEST_CODE_FILE:string = 'cdk.out/asset.origin.request/index.js';
+  // The path of the edge lambda code asset relative to the root of the project
+  public static EDGE_VIEWER_REQUEST_CODE_FILE:string = 'cdk.out/asset.viewer.request/index.js';
   public static EDGE_VIEWER_RESPONSE_CODE_FILE:string = 'cdk.out/asset.viewer.response/index.js';
+  public static EDGE_ORIGIN_REQUEST_CODE_FILE:string = 'cdk.out/asset.origin.request/index.js';
   
   private stack:Construct;
   private context:IContext;
@@ -51,6 +54,9 @@ export class CloudfrontDistribution extends Construct {
 
     // 2) Create lambda@Edge functions
     const scope = REGION == 'us-east-1' ? stack : this;
+    createEdgeFunctionForViewerRequest(scope, context, (edgeLambda:any) => {
+      edgeLambdas.push(edgeLambda);
+    });
     createEdgeFunctionForOriginRequest(scope, context, (edgeLambda:any) => {
       edgeLambdas.push(edgeLambda);
       this.edgeFunctionForOriginRequest = edgeLambda;
@@ -58,7 +64,6 @@ export class CloudfrontDistribution extends Construct {
     createEdgeFunctionForViewerResponse(scope, context, (edgeLambda:any) => {
       edgeLambdas.push(edgeLambda);
     });
-
     const { edgeFunctionForOriginRequest } = this;
 
     // 3) Create the primary origin if indicated.

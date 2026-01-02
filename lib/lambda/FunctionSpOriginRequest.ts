@@ -1,10 +1,11 @@
 import { IConfig, IRequest, IResponse, SamlParms, handler as spHandler } from 'shibboleth-sp';
 import { IContext, Shibboleth } from '../../context/IContext';
 import * as contextJSON from '../../context/context.json';
-import { ParameterTester, instanceOf } from '../Util';
+import { instanceOf } from '../Util';
+import { CLOUDFRONT_CHALLENGE_HEADER_NAME } from '../secrets/Secret';
+import { VIEWER_DOMAIN_HEADER_NAME } from './FunctionSpViewerRequest';
 import { LambdaEdgeOriginRequestEvent } from './OriginRequestEventType';
 import { CachedKeys, checkCache } from './SecretsCache';
-import { CLOUDFRONT_CHALLENGE_HEADER_NAME } from '../secrets/Secret';
 
 const context = contextJSON as IContext;
 const { APP_LOGIN_HEADER, APP_LOGOUT_HEADER, SHIBBOLETH } = context;
@@ -28,8 +29,12 @@ checkCache(cachedKeys).then(() => {
  * 
  * NOTE: It would have been preferable to have designated this function for viewer requests so that it could 
  * intercept EVERY request instead of potentially being bypassed in favor of cached content. However, the content
- * of this function exceeds the 1MB limit for viewer requests. Origin request lambdas can be up to 50MB, and so
- * must be used, and caching for the origin is disabled altogether to ensure EVERY request goes through this function.
+ * of this function needs to be under the 1MB limit for viewer requests. This might be possible, but for now, the
+ * Origin request lambdas can be up to 50MB, and so we are using that instead, with caching for the origin disabled 
+ * altogether to ensure EVERY request goes through this function. For other use cased, like the Boston University
+ * WordPress caching strategy, all cookies and query strings are used to form the cache key, which effectively disables
+ * caching as well by fragmenting it sufficiently so that no request traffic related to authentication is 
+ * served from cache.
  * @param event 
  * @returns 
  */
@@ -41,21 +46,33 @@ export const handler =  async (event:LambdaEdgeOriginRequestEvent) => {
   const { samlPrivateKey, samlCert, jwtPrivateKey, jwtPublicKey, cloudfrontChallenge } = cachedKeys;
 
   // Destructure most variables
-  const { noneBlank } = ParameterTester;
-  const { DNS, ORIGIN } = context;
-  const { certificateARN, hostedZone } = DNS ?? {};
-  const { subdomain, appAuthorization } = ORIGIN ?? {};
   const { request, config } = event.Records[0].cf;
-  const { uri, body, headers, method, querystring, clientIp, origin } = request;
+  const { uri, body, headers, method, querystring, clientIp, origin: { 
+    custom: { customHeaders = {}} = {}} = {} 
+  } = request;
 
-  // Set the cloudfront domain value
-  let cloudfrontDomain = config.distributionDomainName;
-  if(noneBlank(certificateARN, hostedZone, subdomain)) {
-    cloudfrontDomain = subdomain!;
+  // The viewer request lambda will have set this header from what it saw in the host header.
+  const viewerDomain = headers[VIEWER_DOMAIN_HEADER_NAME.toLowerCase()]?.[0]?.value;
+  if( ! viewerDomain ) {
+    console.warn(`
+      WARNING!!! Viewer domain header ${VIEWER_DOMAIN_HEADER_NAME} not found in request headers.
+      This will disrupt SAML operations for function URL origins that depend on knowing the viewer 
+      domain when the origin request policy is set to ALL_VIEWER_EXCEPT_HOST_HEADER, and the viewer 
+      host is swapped with the origin host by the time the origin request lambda runs. This is not a
+      concern for ALB/S3 origins where the origin request policy is ALL_VIEWER, and the host header
+      remains the viewer host.`);
   }
-  else if(noneBlank(certificateARN, hostedZone)) {
-    cloudfrontDomain = `testing123.${hostedZone}`;
-  }
+
+  // Get the host header as it is now.
+  const originDomain = headers['host']?.[0]?.value;
+
+  // We want the viewer domain if available, else the origin domain (see warning above).
+  const domain = viewerDomain ? viewerDomain : originDomain;
+
+  // Get the app authorization setting from the custom headers.
+  const appAuthorization = `${customHeaders['app_authorization']?.[0]?.value}`.toLowerCase() === 'true';
+
+  console.log(`Using ${JSON.stringify({ domain, appAuthorization }, null, 2)}`);
 
   // Build an sp request parameter from incoming request
   const spRequest = { uri, body, headers, method, querystring, clientIp, headerActivity: {
@@ -67,7 +84,7 @@ export const handler =  async (event:LambdaEdgeOriginRequestEvent) => {
     appAuthorization,
     appLoginHeader: APP_LOGIN_HEADER,
     appLogoutHeader: APP_LOGOUT_HEADER,
-    domain: cloudfrontDomain,
+    domain,
     samlParms: { entityId, entryPoint, idpCert, logoutUrl, key: samlPrivateKey, cert: samlCert } as SamlParms,
     customHeaders: [
       { key: CLOUDFRONT_CHALLENGE_HEADER_NAME, value: cloudfrontChallenge }

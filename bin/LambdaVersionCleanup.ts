@@ -2,6 +2,8 @@ import { CloudFrontClient, DistributionSummary, GetDistributionCommand, GetDistr
 import { DeleteFunctionCommand, LambdaClient, ListVersionsByFunctionCommand, ListVersionsByFunctionCommandOutput } from "@aws-sdk/client-lambda";
 import { EDGE_REQUEST_ORIGIN_FUNCTION_BASENAME } from '../lib/EdgeFunctionOriginRequest';
 import { EDGE_RESPONSE_VIEWER_FUNCTION_BASENAME } from '../lib/EdgeFunctionViewerResponse';
+import { EDGE_REQUEST_VIEWER_FUNCTION_BASENAME } from '../lib/EdgeFunctionViewerRequest';
+
 import { IContext } from '../context/IContext';
 import * as ctx from '../context/context.json';
 
@@ -256,6 +258,7 @@ const deleteVersions = async (functionList:string) => {
 deleteVersions(
  `${STACK_ID}-${Landscape}-${EDGE_REQUEST_ORIGIN_FUNCTION_BASENAME}, \
   ${STACK_ID}-${Landscape}-${EDGE_RESPONSE_VIEWER_FUNCTION_BASENAME}, \
+  ${STACK_ID}-${Landscape}-${EDGE_REQUEST_VIEWER_FUNCTION_BASENAME}, \
   ${STACK_ID}-${Landscape}-app-function`
 ).then(() => {
   console.log('Completed. You should now be able to delete the stack.');

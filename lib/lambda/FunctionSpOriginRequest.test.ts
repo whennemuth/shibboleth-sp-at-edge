@@ -1,6 +1,6 @@
 import { jest } from '@jest/globals';
 import { IConfig, IRequest, IResponse } from 'shibboleth-sp';
-import { handler } from './FunctionSpOrigin';
+import { handler } from './FunctionSpOriginRequest';
 import { CachedKeys } from './SecretsCache';
 import { CloudFrontRequest, LambdaEdgeOriginRequestEvent } from './OriginRequestEventType';
 import { instanceOf } from '../Util';
@@ -100,7 +100,7 @@ const getEssentialEvent = (querystring:string) => {
  * Test all endpoints of authentication flow for the sp.
  * Also assert that the flow changes where necessary when the app is configured to "decide" authentication requirement. 
  */
-describe('FunctionSpOrigin.handler', () => {
+describe('FunctionSpOriginRequest.handler', () => {
 
   it('Should return the expected response type if the sp handler returns the request', async () => {
     const event = getEssentialEvent(SP_RETVAL_TYPE.request);

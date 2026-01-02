@@ -7,7 +7,7 @@ import { Construct } from "constructs";
 import path = require("path");
 import { CloudfrontDistribution } from "./Distribution";
 
-export const EDGE_REQUEST_ORIGIN_FUNCTION_BASENAME = 'SPFunctionOrigin';
+export const EDGE_REQUEST_ORIGIN_FUNCTION_BASENAME = 'SPFunctionOriginRequest';
 
 /**
  * Create policy used by lambda@edge origin request function to access secrets manager.
@@ -39,7 +39,7 @@ const createSameRegionEdgeFunction = (stack:Construct, context:IContext):NodejsF
   const { STACK_ID, TAGS: { Landscape} } = context;
   const ftn = new NodejsFunction(stack, 'edge-function-origin-request', {
     runtime: Runtime.NODEJS_18_X,
-    entry: 'lib/lambda/FunctionSpOrigin.ts',
+    entry: 'lib/lambda/FunctionSpOriginRequest.ts',
     functionName: `${STACK_ID}-${Landscape}-${EDGE_REQUEST_ORIGIN_FUNCTION_BASENAME}`,
     bundling: {
       externalModules: [ '@aws-sdk/*' ],
