@@ -1,4 +1,5 @@
 import { CfnOutput, Duration, RemovalPolicy } from 'aws-cdk-lib';
+import { AUTH_PATHS } from 'shibboleth-sp';
 import { Certificate, ICertificate } from 'aws-cdk-lib/aws-certificatemanager';
 import { AllowedMethods, BehaviorOptions, CacheCookieBehavior, CacheHeaderBehavior, CachePolicy, CachePolicyProps, CacheQueryStringBehavior, Distribution, DistributionProps, EdgeLambda, OriginRequestPolicy, PriceClass, ViewerProtocolPolicy } from 'aws-cdk-lib/aws-cloudfront';
 import { NodejsFunction } from 'aws-cdk-lib/aws-lambda-nodejs';
@@ -171,7 +172,7 @@ export class CloudfrontDistribution extends Construct {
   private createDistribution = (ignoreRoute53: boolean) => {
     const { stack, context, origin, testOrigin, edgeLambdas } = this;
     const { isNotBlank, noneBlank } = ParameterTester;
-    const { TAGS, STACK_ID, DNS, ORIGIN } = context;
+    const { TAGS, STACK_ID, DNS, ORIGIN, APP_LOGIN_HEADER, APP_LOGOUT_HEADER } = context;
     const { hostedZone, certificateARN } = DNS || {};
     const { subdomain } = ORIGIN || {};
     const distributionName = `${STACK_ID}-cloudfront-distribution-${TAGS.Landscape}`;
@@ -192,7 +193,20 @@ export class CloudfrontDistribution extends Construct {
         cachePolicyName: `BU-Cache-Policy-${TAGS.Landscape}`,
         comment: 'Cache policy matching distributions involved with web-router',
         cookieBehavior: CacheCookieBehavior.all(),
-        headerBehavior: CacheHeaderBehavior.allowList('Host', 'Referer', 'User-Agent', 'X-Upstream'),
+        headerBehavior: CacheHeaderBehavior.allowList(
+
+          // Legacy BU cache fragmentation headers
+          'Host', 
+          'Referer', 
+          'User-Agent', 
+          'X-Upstream',
+
+          // Additional BU cache fragmentation headers
+          APP_LOGIN_HEADER,  
+          APP_LOGOUT_HEADER,
+          'Authorization', 
+          'X-Forwarded-For'
+        ),
         queryStringBehavior: CacheQueryStringBehavior.all()
       } as CachePolicyProps);
     }
@@ -297,6 +311,12 @@ export class CloudfrontDistribution extends Construct {
           // https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/distribution-web-values-specify.html#DownloadDistValuesPathPattern
           '/testing123': getBehavior(testOrigin, false, true),
           '/testing123/*': getBehavior(testOrigin, false, true),
+          
+          // SAML authentication paths - force NO_CACHE to prevent authentication issues
+          [AUTH_PATHS.LOGIN]: getBehavior(origin, customDomain(), true),
+          [AUTH_PATHS.LOGOUT]: getBehavior(origin, customDomain(), true),
+          [AUTH_PATHS.ASSERT]: getBehavior(origin, customDomain(), true),
+          [AUTH_PATHS.METADATA]: getBehavior(origin, customDomain(), true)
         }
       }, distributionProps);
     }
