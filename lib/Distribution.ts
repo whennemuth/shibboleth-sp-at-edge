@@ -204,8 +204,6 @@ export class CloudfrontDistribution extends Construct {
           // Additional BU cache fragmentation headers
           APP_LOGIN_HEADER,  
           APP_LOGOUT_HEADER,
-          'Authorization', 
-          'X-Forwarded-For'
         ),
         queryStringBehavior: CacheQueryStringBehavior.all()
       } as CachePolicyProps);
