@@ -1,0 +1,168 @@
+{
+    "Records": [
+        {
+            "cf": {
+                "config": {
+                    "distributionDomainName": "d31tdybyhteik3.cloudfront.net",
+                    "distributionId": "EGNDP6HZJ92WP",
+                    "eventType": "origin-request",
+                    "requestId": "9oNoHStBnUo0QtG1u1KPO1jo-HtvQwXxFJOcdgSmwkZCurj9UTCQmA=="
+                },
+                "request": {
+                    "clientIp": "2601:195:c980:f406:2501:aa53:c949:4d95",
+                    "headers": {
+                        "host": [
+                            {
+                                "key": "Host",
+                                "value": "d31tdybyhteik3.cloudfront.net"
+                            }
+                        ],
+                        "accept-language": [
+                            {
+                                "key": "Accept-Language",
+                                "value": "en-US,en;q=0.9"
+                            }
+                        ],
+                        "accept": [
+                            {
+                                "key": "Accept",
+                                "value": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7"
+                            }
+                        ],
+                        "referer": [
+                            {
+                                "key": "Referer",
+                                "value": "https://shib-test.bu.edu/"
+                            }
+                        ],
+                        "x-forwarded-for": [
+                            {
+                                "key": "X-Forwarded-For",
+                                "value": "2601:195:c980:f406:2501:aa53:c949:4d95"
+                            }
+                        ],
+                        "user-agent": [
+                            {
+                                "key": "User-Agent",
+                                "value": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"
+                            }
+                        ],
+                        "via": [
+                            {
+                                "key": "Via",
+                                "value": "2.0 4ca90f4d4f7415e2022b1269d1067fb4.cloudfront.net (CloudFront)"
+                            }
+                        ],
+                        "content-length": [
+                            {
+                                "key": "Content-Length",
+                                "value": "18547"
+                            }
+                        ],
+                        "pragma": [
+                            {
+                                "key": "pragma",
+                                "value": "no-cache"
+                            }
+                        ],
+                        "cache-control": [
+                            {
+                                "key": "cache-control",
+                                "value": "no-cache"
+                            }
+                        ],
+                        "sec-ch-ua": [
+                            {
+                                "key": "sec-ch-ua",
+                                "value": "\"Google Chrome\";v=\"143\", \"Chromium\";v=\"143\", \"Not A(Brand\";v=\"24\""
+                            }
+                        ],
+                        "sec-ch-ua-mobile": [
+                            {
+                                "key": "sec-ch-ua-mobile",
+                                "value": "?0"
+                            }
+                        ],
+                        "sec-ch-ua-platform": [
+                            {
+                                "key": "sec-ch-ua-platform",
+                                "value": "\"Windows\""
+                            }
+                        ],
+                        "origin": [
+                            {
+                                "key": "origin",
+                                "value": "https://shib-test.bu.edu"
+                            }
+                        ],
+                        "content-type": [
+                            {
+                                "key": "content-type",
+                                "value": "application/x-www-form-urlencoded"
+                            }
+                        ],
+                        "upgrade-insecure-requests": [
+                            {
+                                "key": "upgrade-insecure-requests",
+                                "value": "1"
+                            }
+                        ],
+                        "sec-fetch-site": [
+                            {
+                                "key": "sec-fetch-site",
+                                "value": "cross-site"
+                            }
+                        ],
+                        "sec-fetch-mode": [
+                            {
+                                "key": "sec-fetch-mode",
+                                "value": "navigate"
+                            }
+                        ],
+                        "sec-fetch-dest": [
+                            {
+                                "key": "sec-fetch-dest",
+                                "value": "document"
+                            }
+                        ],
+                        "accept-encoding": [
+                            {
+                                "key": "accept-encoding",
+                                "value": "gzip, deflate, br, zstd"
+                            }
+                        ],
+                        "priority": [
+                            {
+                                "key": "priority",
+                                "value": "u=0, i"
+                            }
+                        ],
+                        "viewer_domain": [
+                            {
+                                "key": "VIEWER_DOMAIN",
+                                "value": "d31tdybyhteik3.cloudfront.net"
+                            }
+                        ]
+                    },
+                    "method": "POST",
+                    "origin": {
+                        "custom": {
+                            "customHeaders": {},
+                            "domainName": "zriwzjrnfgsv5zg5tdlistfmue0gnqud.lambda-url.us-east-2.on.aws",
+                            "keepaliveTimeout": 5,
+                            "path": "",
+                            "port": 443,
+                            "protocol": "https",
+                            "readTimeout": 30,
+                            "sslProtocols": [
+                                "TLSv1.2"
+                            ]
+                        }
+                    },
+                    "querystring": "",
+                    "uri": "/assert"
+                }
+            }
+        }
+    ]
+}

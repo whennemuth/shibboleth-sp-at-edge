@@ -1,0 +1,123 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Parameters:
+  Alias:
+    Type: String
+    Default: ""
+    Description: "Alias of the server which must be unique in CloudFront - use a comma separated list to get more than one"
+    AllowedPattern: ^$|^[\*a-z0-9\-\.\,]+$
+  WebACL:
+    Type: String
+    Default: "arn:aws:wafv2:us-east-1:502886588882:global/webacl/websites-security-prod-cyan-waf-WAF-7ZOSIO65G9I6/e4f5fbb7-dfc2-485d-8ac0-3df916268be1"
+    Description: "WebACL to set for this CloudFront distribution (default is production WebACL; empty string indicates no-WebACL)"
+  RoutingOriginDNS:
+    Type: String
+    Description: 'DNS name for the front-end routing ALB (default is production value)'
+    Default: "webrouter-prod-teal.webrouter-prd.aws-cloud.bu.edu"
+  SSLCertificateID:
+    #AllowedPattern: ^$|(arn:aws:acm:)([a-z0-9/:-])*([a-z0-9])$
+    Description: '[ Optional ] The AWS Certification Manager certificate ID for the ALB certificate - this certificate should be created in the region you wish to run the ALB and must reference the WordPress domain name you use below.'
+    Type: String
+    Default: "6504f5c8-0e04-4032-b0a2-b65deefb9b8e"
+  RedirectToHttps:
+    Type: String
+    Default: "true"
+    Description: "Alias of the server which must be unique in CloudFront"
+    AllowedValues:
+      - 'true'
+      - 'false'
+  LogPrefix:
+    #AllowedPattern: ^$|(arn:aws:acm:)([a-z0-9/:-])*([a-z0-9])$
+    Description: 'S3 log bucket for our output'
+    Type: String
+    Default: "cf-logs/"
+  LogBucket:
+    #AllowedPattern: ^$|(arn:aws:acm:)([a-z0-9/:-])*([a-z0-9])$
+    Description: 'S3 log bucket for our output (default is production value; empty string indicates no logging)'
+    Type: String
+    Default: "websites-security-prod-cyan-waf-cf-access-log-s3.s3.amazonaws.com"
+
+Conditions:
+  LogBucketSetCondition: !Not
+    - !Equals
+      - !Ref 'LogBucket'
+      - ''
+  WebACLSetCondition: !Not
+    - !Equals
+      - !Ref 'WebACL'
+      - ''
+  RedirectToHttps: !Equals
+    - !Ref RedirectToHttps
+    - 'true'
+
+Resources:
+
+  CloudFrontDistribution:
+    Type: AWS::CloudFront::Distribution
+    Properties:
+      DistributionConfig:
+        Aliases: !Split
+          - ','
+          - !Ref 'Alias'
+        DefaultCacheBehavior:
+          TargetOriginId: router
+          ViewerProtocolPolicy: !If
+            - RedirectToHttps
+            - redirect-to-https
+            - allow-all
+          AllowedMethods:
+            - DELETE
+            - GET
+            - HEAD
+            - OPTIONS
+            - PATCH
+            - POST
+            - PUT
+          ForwardedValues:
+            QueryString: true
+            Headers:
+              - Host
+              - Referer
+              - User-Agent
+              - X-Upstream
+            Cookies:
+              Forward: all
+        Comment: !Sub "${Alias}"
+        Enabled: true
+        IPV6Enabled: false
+        Logging:
+          Bucket: !If
+            - LogBucketSetCondition
+            - !Ref 'LogBucket'
+            - !Ref 'AWS::NoValue'
+          IncludeCookies: false
+          Prefix: !Ref 'LogPrefix'
+        Origins:
+          - DomainName: !Ref "RoutingOriginDNS"
+            Id: router
+            CustomOriginConfig:
+              HTTPPort: '80'
+              #OriginProtocolPolicy: http-only
+              HTTPSPort: '443'
+              OriginProtocolPolicy: match-viewer
+              OriginSSLProtocols:
+                - TLSv1
+                - TLSv1.1
+                - TLSv1.2
+        PriceClass: PriceClass_100
+        ViewerCertificate:
+          AcmCertificateArn: !Sub "arn:aws:acm:${AWS::Region}:${AWS::AccountId}:certificate/${SSLCertificateID}"
+          SslSupportMethod: sni-only
+          MinimumProtocolVersion: TLSv1
+        WebACLId: !If
+          - WebACLSetCondition
+          - !Ref 'WebACL'
+          - !Ref 'AWS::NoValue'
+Outputs:
+  CloudFrontARN:
+    Value: !Ref CloudFrontDistribution
+    Export:
+      Name: !Sub "${AWS::StackName}-buedu-cfn-arn"
+  CloudFrontDNS:
+    Value: !GetAtt "CloudFrontDistribution.DomainName"
+    Export:
+      Name: !Sub "${AWS::StackName}-buedu-cfn-domainname"
