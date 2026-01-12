@@ -35,6 +35,8 @@
   "TAGS": {
     "Service": "websites",
     "Function": "wordpress",
-    "Landscape": "devl1"
+    "Landscape": "devl1",
+    "CostCenter": "AWS Word Press Migration to AWS",
+    "Ticket": "WP_MIGRATION_TBD"
   }
 }

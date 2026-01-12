@@ -11,6 +11,7 @@ import { albExists } from '../lib/OriginAlb';
 import { findARecord } from '../lib/Route53';
 import { getClone, getStackName, logHeader } from '../lib/Util';
 import { SecretsManagerSecret } from '../lib/secrets/Secret';
+import { BU_NameTagAspect, TaggingAspect } from '../lib/Tagging';
 
 // Instatiate the app
 const app = new App();
@@ -32,7 +33,7 @@ const _context = ctx as IContext;
     SHIBBOLETH: { secret: { secretArn } },
     ORIGIN, ORIGIN: { subdomain } = {},
     DNS: { hostedZone } = {},
-    TAGS: { Landscape, Function, Service }
+    TAGS: { Landscape, Function, Service, CostCenter='', Ticket='' }
   } = context;
 
   const dnsName = (ORIGIN as OriginAlb)?.dnsName;
@@ -159,4 +160,18 @@ const _context = ctx as IContext;
   
   new CloudfrontDistribution(stack, stackName);
   
+  // Apply standard tags to all resources in each stack
+  // SEE: https://github.com/bu-ist/buaws-istcloud-information/blob/main/aws-tagging-standard.md#costcenter
+  // NOTE: The CostCenter value is "AWS Word Press Migration to AWS", not "AWS WordPress Migration to AWS"
+  const standardTags = { 
+    Service, 
+    Function, 
+    Landscape, 
+    CostCenter, 
+    Ticket 
+  };
+  new TaggingAspect(stack, standardTags).applyTags({ 
+    aspect: new BU_NameTagAspect(standardTags) 
+  });
+
 })();
