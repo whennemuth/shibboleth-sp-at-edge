@@ -1,10 +1,13 @@
 dist/*
 *.d.ts
 node_modules
+context/context.bkp.*
 
 # CDK asset staging directory
 .cdk.staging
 cdk.out
 cdk.context.json
 .env
+
+RESUME-NEXT.txt
 bin/origin-swap/sample-origin-*
