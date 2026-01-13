@@ -1,9 +1,18 @@
-import { CreateSecretCommand, CreateSecretCommandOutput, GetSecretValueCommand, GetSecretValueCommandOutput, SecretsManagerClient, UpdateSecretCommand, UpdateSecretCommandOutput } from "@aws-sdk/client-secrets-manager";
+import { CreateSecretCommand, CreateSecretCommandOutput, GetSecretValueCommand, GetSecretValueCommandOutput, SecretsManagerClient, Tag, UpdateSecretCommand, UpdateSecretCommandOutput } from "@aws-sdk/client-secrets-manager";
 import { SecretFieldNames } from "../../context/IContext";
 import { Keys } from 'shibboleth-sp';
 import { Key, KeyConfig } from "./Key";
 
 export const CLOUDFRONT_CHALLENGE_HEADER_NAME = 'cloudfront-challenge';
+
+export type SecretsManagerSecretParms = {
+  secretName: string,
+  fldNames: SecretFieldNames,
+  client?: SecretsManagerClient,
+  region?: string,
+  description?: string,
+  Tags?: Tag[]
+}
 
 /**
  * Class representing a secret in AWS Secrets Manager that holds Shibboleth and JWT keys/certificates.
@@ -14,9 +23,7 @@ export class SecretsManagerSecret {
   private kvPairs: Record<string, string> = {};
   private lookupResult: string | undefined;
 
-  constructor( private parms: { 
-    secretName: string, fldNames: SecretFieldNames, client?: SecretsManagerClient, region?: string, description?: string 
-  }) {
+  constructor( private parms: SecretsManagerSecretParms) {
     const { client, region:_region } = this.parms;
     if( ! client ) {
       const { REGION, AWS_REGION } = process.env;
@@ -83,12 +90,14 @@ export class SecretsManagerSecret {
     const {
       getSecretValueJson,
       parms: { 
-        secretName:Name, description:Description, 
+        secretName:Name, description:Description, Tags=[],
         client = { send: () => { throw new Error('Client not initialized'); } } 
       } 
     } = this;
     console.log(`Creating secret ${Name}...`);
-    const command = new CreateSecretCommand({ Name, Description, SecretString: await getSecretValueJson() });
+    const command = new CreateSecretCommand({ 
+      Name, Description, SecretString: await getSecretValueJson(), Tags
+    });
     return await client.send(command);
   }
 
@@ -99,10 +108,15 @@ export class SecretsManagerSecret {
   private update = async (): Promise<UpdateSecretCommandOutput> => {
     const {
       getSecretValueJson,
-      parms: { secretName:Name, client = { send: () => { throw new Error('Client not initialized'); } } } 
+      parms: { 
+        secretName:Name, description:Description,
+        client = { send: () => { throw new Error('Client not initialized'); } } 
+      } 
     } = this;
     console.log(`Updating secret ${Name}...`);
-    const command = new UpdateSecretCommand({ SecretId: Name, SecretString: await getSecretValueJson() });
+    const command = new UpdateSecretCommand({ 
+      SecretId: Name, SecretString: await getSecretValueJson(), Description 
+    });
     return await client.send(command);
   }
 

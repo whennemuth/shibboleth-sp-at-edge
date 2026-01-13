@@ -11,6 +11,8 @@
     "cleanup": "ts-node bin/LambdaVersionCleanup.ts",
     "clearcache": "sh bin/clear-cache.sh",
     "create-secret": "ts-node -r dotenv/config -e \"require('./lib/secrets/SecretsManager.ts').createOrUpdateSecrets()\"",
+    "share-secret": "ts-node -r dotenv/config -e \"require('./lib/secrets/SecretsManager.ts').attachSecretPolicyForAccount(process.argv[1], process.argv[2])\"",
+    "share-secret2": "ts-node -r dotenv/config -e \"require('./lib/secrets/SecretsManager.ts').attachSecretPolicyForAccount(process.argv[1], process.argv[2])\"",
     "test": "jest --silent",
     "cdk": "cdk",
     "deploy": "cdk deploy --all --no-rollback --require-approval never",
