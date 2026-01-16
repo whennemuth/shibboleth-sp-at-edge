@@ -6,8 +6,6 @@
     "app": "bin/App.ts"
   },
   "scripts": {
-    "build": "tsc",
-    "watch": "tsc -w",
     "cleanup": "ts-node bin/LambdaVersionCleanup.ts",
     "clearcache": "sh bin/clear-cache.sh",
     "create-secret": "ts-node -r dotenv/config -e \"require('./lib/secrets/SecretsManager.ts').createOrUpdateSecrets()\"",
@@ -18,8 +16,19 @@
     "deploy": "cdk deploy --all --no-rollback --require-approval never",
     "redeploy": "cdk destroy --all -f && npm run deploy --all",
     "get-stack-name": "ts-node -e \"require('./lib/Util.ts').echoStackName()\"",
-    "synth": "npm run get-stack-name | xargs cdk synth 2>&1 | tee cdk.out/synth.output.yaml"
+    "synth": "npm run get-stack-name | xargs cdk synth 2>&1 | tee cdk.out/synth.output.yaml",
+    "build": "rm -rf dist/ && npm run build:esm && npm run build:cjs",
+    "build:tsc": "rm -rf dist/ && npm run build:esm && npm run build:cjs",
+    "build:esm": "tsc",
+    "build:cjs": "tsc --project tsconfig.cjs.json",
+    "pack": "npm run build && npm pack --pack-destination ."
   },
+  "module": "dist/esm/bin/build/index.js",
+  "main": "dist/cjs/bin/build/index.js",
+  "types": "dist/types/bin/build/index.d.ts",
+  "files": [
+    "dist"
+  ],
   "dependencies": {
     "@aws-sdk/client-secrets-manager": "^3.577.0",
     "@aws-sdk/client-sts": "^3.964.0",

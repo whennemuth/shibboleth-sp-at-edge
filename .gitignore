@@ -1,7 +1,10 @@
-dist/*
-*.d.ts
 node_modules
 context/context.bkp.*
+
+# Build artifacts
+dist/*
+*.d.ts
+*.tgz
 
 # CDK asset staging directory
 .cdk.staging

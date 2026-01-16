@@ -198,6 +198,8 @@ Deeper dives into unit testing and logging:
 - [Where are the Lambda@Edge cloudwatch logs?](./docs/testing-lambda-at-edge-logs.md)
 
 
+## Packaging/Installing
+See [USAGE.md](./bin/build/USAGE.md) for packaging and usage instructions.
 
 ## References
 
