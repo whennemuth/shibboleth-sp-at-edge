@@ -15,3 +15,6 @@ export {
 
 // Utility functions that might be useful for consumers
 export { getStackName } from '../../lib/Util';
+
+// Secrets management class
+export { SecretsManager } from '../../lib/secrets/SecretsManager';
