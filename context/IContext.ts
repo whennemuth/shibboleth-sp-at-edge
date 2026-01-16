@@ -22,7 +22,7 @@ export enum OriginType {
 };
 export type Origin = {
     originType:          OriginType;
-    stackId:             string;
+    stackId?:            string;
     httpPort?:           number;
     httpsPort:           number;
     subdomain?:          string; // Includes hostedZone AND subdomain
