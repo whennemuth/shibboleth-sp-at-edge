@@ -18,3 +18,6 @@ export { getStackName } from '../../lib/Util';
 
 // Secrets management class
 export { SecretsManager } from '../../lib/secrets/SecretsManager';
+
+// Tagging utilities
+export { BU_NameTagAspect, TaggingAspect } from '../../lib/Tagging';
