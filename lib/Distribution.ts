@@ -35,7 +35,10 @@ export class CloudfrontDistribution extends Construct {
   private cloudFrontDistribution:Distribution;
   private buCachePolicy:CachePolicy|undefined;
 
-  constructor(stack: Construct, stackName: string, props?: { ignoreRoute53: boolean }) {
+  constructor(stack: Construct, stackName: string, props?: {
+    httpOriginBase?: HttpOriginBase,
+    ignoreRoute53: boolean 
+  }) {
     
     super(stack, stackName);
 
@@ -47,7 +50,7 @@ export class CloudfrontDistribution extends Construct {
     const { validateContext, createDistribution, edgeLambdas } = this;
     const { REGION, ORIGIN } = context;
     const { originType } = (ORIGIN ?? {} as Origin);
-    const { ignoreRoute53=false } = props || {};
+    const { ignoreRoute53=false, httpOriginBase } = props || {};
 
     // 1) Validate context parameters
     validateContext();
@@ -67,20 +70,24 @@ export class CloudfrontDistribution extends Construct {
     const { edgeFunctionForOriginRequest } = this;
 
     // 3) Create the primary origin if indicated.
-    switch(originType) {
-      case OriginType.ALB:
-        this.origin = getAlbOrigin(ORIGIN as OriginAlb);
-        break;
-      case OriginType.FUNCTION_URL:
-        this.origin = getFunctionUrlOrigin({
-          stack, context, edgeFunctionForOriginRequest, origin:(ORIGIN as OriginFunctionUrl)
-        });
-        break;
-      default:
-        console.log('ORIGIN is not defined, using function url as test origin');
-        break;
-    };
-    
+    if(httpOriginBase) {
+      this.origin = httpOriginBase;
+    }
+    else {
+      switch(originType) {
+        case OriginType.ALB:
+          this.origin = getAlbOrigin(ORIGIN as OriginAlb);
+          break;
+        case OriginType.FUNCTION_URL:
+          this.origin = getFunctionUrlOrigin({
+            stack, context, edgeFunctionForOriginRequest, origin:(ORIGIN as OriginFunctionUrl)
+          });
+          break;
+        default:
+          console.log('ORIGIN is not defined, using function url as test origin');
+          break;
+      };
+    }    
 
     // 4) Create the test origin
     if(originType == OriginType.FUNCTION_URL) {
@@ -141,7 +148,7 @@ export class CloudfrontDistribution extends Construct {
 
     // DNS should not be partially configured - Certificate and Route53 must go together.
     if(someBlankSomeNot(certificateARN, hostedZone)) {
-      throw new Error('hostedZone and certifidateARN are mutually inclusive');
+      throw new Error('hostedZone and certificateARN are mutually inclusive');
     }
 
     // DNS should be configured if a subdomain is specified for the origin.
@@ -348,5 +355,8 @@ export class CloudfrontDistribution extends Construct {
     }
   }
 
+  public get distribution(): Distribution {
+    return this.cloudFrontDistribution;
+  }
 }
 

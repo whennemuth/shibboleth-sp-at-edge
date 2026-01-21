@@ -4,6 +4,7 @@ import 'source-map-support/register';
 import { IContext } from '../context/IContext';
 import * as ctx from '../context/context.json';
 import { ShibbolethAtEdgeConstruct } from '../lib/ShibbolethAtEdgeConstruct';
+import { getStackName } from './build';
 
 // Instantiate the app
 const app = new App();
@@ -13,6 +14,10 @@ const context = ctx as IContext;
 
 // Create the Shibboleth infrastructure using the reusable construct
 (async () => {
-  const stack = await ShibbolethAtEdgeConstruct.createStack(app, context);
+  const stack = await ShibbolethAtEdgeConstruct.createStack({
+    scope: app,
+    id: getStackName(context),
+    context: context
+  });
 })();
 

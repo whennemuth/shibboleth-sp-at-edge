@@ -10,6 +10,19 @@ import { findARecord } from './Route53';
 import { SecretsManagerSecret } from './secrets/Secret';
 import { BU_NameTagAspect, TaggingAspect } from './Tagging';
 import { getClone, getStackName, logHeader } from './Util';
+import { HttpOriginBase } from './Origin';
+
+/**
+ * @param scope - The parent construct (can be App, Stack, or other Construct)
+ * @param id - The construct identifier
+ * @param context - The Shibboleth configuration context
+ */
+export type ShibbolethAtEdgeConstructProps = {
+  scope: Construct,
+  id: string,
+  context: IContext,
+  httpOriginBase?: HttpOriginBase,
+};
 
 /**
  * A reusable construct that creates the complete Shibboleth infrastructure including:
@@ -22,47 +35,59 @@ import { getClone, getStackName, logHeader } from './Util';
  * Can be used both as a standalone deployment or embedded within other stacks.
  */
 export class ShibbolethAtEdgeConstruct extends Construct {
+
+  private static ignoreRoute53: boolean = false;
+
+  private _cloudfrontDistribution:CloudfrontDistribution;
   
   /**
    * Static factory method that performs all async validation and setup before creating the construct.
    * Use this instead of calling the constructor directly.
    * 
-   * @param scope - The parent construct (can be App, Stack, or other Construct)
-   * @param id - The construct identifier
-   * @param context - The Shibboleth configuration context
+   * @param props - The construct properties
    * @returns Promise<ShibbolethAtEdgeConstruct> - The fully initialized construct
    */
-  public static async getInstance(scope: Construct, id: string, context: IContext): Promise<ShibbolethAtEdgeConstruct> {
+  public static async getInstance(props: ShibbolethAtEdgeConstructProps): Promise<ShibbolethAtEdgeConstruct> {
+
     // Perform all async validation and setup
-    const processedContext = await ShibbolethAtEdgeConstruct.performAsyncSetup(context);
+    const processedContext = await ShibbolethAtEdgeConstruct.performAsyncSetup(props.context);
     
     // Create and return the construct with the processed context
-    return new ShibbolethAtEdgeConstruct(scope, id, processedContext);
+    return new ShibbolethAtEdgeConstruct({
+      ...props,
+      context: processedContext} satisfies ShibbolethAtEdgeConstructProps);
   }
 
   /**
    * Convenience method for creating a standalone stack with this construct.
    * 
-   * @param scope - The parent construct (usually the App)
-   * @param context - The Shibboleth configuration context
+   * @param props - The construct properties
    * @returns Promise<Stack> - A stack containing the Shibboleth construct
    */
-  public static async createStack(scope: Construct, context: IContext): Promise<Stack> {
+  public static async createStack(props: ShibbolethAtEdgeConstructProps): Promise<Stack> {
+    const { scope, context } = props;
+
     // Perform all async validation and setup
     const processedContext = await ShibbolethAtEdgeConstruct.performAsyncSetup(context);
     
-    const { ACCOUNT: account, REGION: region, TAGS: { Landscape, Function, Service } } = processedContext;
+    const { ACCOUNT: account, REGION: region, TAGS: { 
+      Landscape, Function, Service, CostCenter='', Ticket='' 
+    } } = processedContext;
+
     const stackName = getStackName(processedContext);
     
     const stack = new Stack(scope, stackName, {
       stackName,
       description: 'Lambda-based shibboleth service provider',
       env: { account, region },
-      tags: { Service, Function, Landscape }
+      tags: { Service, Function, Landscape, CostCenter, Ticket },
     });
     
     // Create the construct within the stack
-    new ShibbolethAtEdgeConstruct(stack, stackName, processedContext);
+    new ShibbolethAtEdgeConstruct({
+      ...props,
+      scope: stack,
+      context: processedContext} satisfies ShibbolethAtEdgeConstructProps);
     
     return stack;
   }
@@ -70,54 +95,39 @@ export class ShibbolethAtEdgeConstruct extends Construct {
   /**
    * Private constructor - use getInstance() or createStack() instead
    */
-  constructor(scope: Construct, id: string, context: IContext) {
+  constructor(private props: ShibbolethAtEdgeConstructProps) {
+    const { scope, id, context } = props;
     super(scope, id);
     
     // Configure custom resource defaults on the parent stack
-    const stack = Stack.of(this);
-    if (stack) {
-      CustomResourceConfig.of(stack).addRemovalPolicy(RemovalPolicy.DESTROY);
-      CustomResourceConfig.of(stack).addLogRetentionLifetime(RetentionDays.ONE_WEEK);
+    const construct = Stack.of(this);
+    if (construct) {
+      CustomResourceConfig.of(construct).addRemovalPolicy(RemovalPolicy.DESTROY);
+      CustomResourceConfig.of(construct).addLogRetentionLifetime(RetentionDays.ONE_WEEK);
       
       // Set the tags for the stack
       var tags: object = context.TAGS;
       for (const [key, value] of Object.entries(tags)) {
-        stack.tags.setTag(key, value);
+        construct.tags.setTag(key, value);
       }
+
+      // Apply standard tags to all resources
+      const { TAGS: { Landscape, Function, Service, CostCenter='', Ticket='' } } = context;
+      const standardTags = { Service, Function, Landscape, CostCenter, Ticket };
+      new TaggingAspect(construct, standardTags).applyTags({ 
+        aspect: new BU_NameTagAspect(standardTags) 
+      });
     }
 
     // Set context for the construct
     this.node.setContext('stack-parms', context);
-    
-    // Create the shared resources
-    ShibbolethAtEdgeConstruct.createSharedResources(this, context);
-  }
 
-  /**
-   * Creates the shared Shibboleth resources that are common to both Stack and Construct implementations
-   */
-  public static createSharedResources(scope: Construct, context: IContext): void {
     // Create the CloudFront distribution (context is already validated)
     const distributionId = scope.node.id.endsWith('Stack') ? scope.node.id : 'Distribution';
-    new CloudfrontDistribution(scope, distributionId);
-    
-    // Apply standard tags to all resources
-    const { TAGS: { Landscape, Function, Service, CostCenter='', Ticket='' } } = context;
-    const standardTags = { 
-      Service, 
-      Function, 
-      Landscape, 
-      CostCenter, 
-      Ticket 
-    };
-    
-    // Find the stack to apply tags to
-    const stack = Stack.of(scope);
-    if (stack) {
-      new TaggingAspect(stack, standardTags).applyTags({ 
-        aspect: new BU_NameTagAspect(standardTags) 
-      });
-    }
+    new CloudfrontDistribution(scope, distributionId, {
+      ignoreRoute53: ShibbolethAtEdgeConstruct.ignoreRoute53,
+      httpOriginBase: this.props.httpOriginBase
+    });
   }
 
   /**
@@ -152,11 +162,10 @@ export class ShibbolethAtEdgeConstruct extends Construct {
     }
 
     // Find out if an A record for the subdomain already exists AND was not created by this stack.
-    let ignoreRoute53: boolean = false;
     if( subdomain && hostedZone ) {
       const record = await findARecord(hostedZone, subdomain, region);
       if(record.recordSet && ! record.createdByThisStack) {
-        ignoreRoute53 = true;
+        ShibbolethAtEdgeConstruct.ignoreRoute53 = true;
       }
     }
     
@@ -258,5 +267,9 @@ export class ShibbolethAtEdgeConstruct extends Construct {
         process.exit(1);
       });
     }
+  }
+
+  public get cloudfrontDistribution(): CloudfrontDistribution {
+    return this._cloudfrontDistribution;
   }
 }

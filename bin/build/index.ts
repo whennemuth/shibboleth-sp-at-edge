@@ -21,3 +21,11 @@ export { SecretsManager } from '../../lib/secrets/SecretsManager';
 
 // Tagging utilities
 export { BU_NameTagAspect, TaggingAspect } from '../../lib/Tagging';
+
+// Edge function basenames for reference
+export { EDGE_REQUEST_ORIGIN_FUNCTION_BASENAME } from '../../lib/EdgeFunctionOriginRequest';
+export { EDGE_REQUEST_VIEWER_FUNCTION_BASENAME } from '../../lib/EdgeFunctionViewerRequest';
+export { EDGE_RESPONSE_VIEWER_FUNCTION_BASENAME } from '../../lib/EdgeFunctionViewerResponse';
+
+// Lambda cleanup utility
+export { deleteVersions as deleteEdgeLambdaVersions } from '../DistributionToCleanup'
