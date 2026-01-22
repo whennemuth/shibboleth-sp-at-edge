@@ -121,7 +121,7 @@ const getOkResponse = (event:any) => {
 
     // 2) If No user details header, check for the jwt and get user details from that.
     if( ! user) {
-      user = getUserFromJwt(headers['cookie'], 'auth-token-cookie');
+      user = getUserFromJwt(headers['cookie'], JwtTools.COOKIE_NAME);
     }
 
     // 3) If no jwt or expected jwt content, respond with warning and list out what headers were found.
