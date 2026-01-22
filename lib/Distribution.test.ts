@@ -132,7 +132,7 @@ describe('CloudfrontDistribution', () => {
       stack.node.setContext('stack-parms', context);
       
       expect(() => {
-        new CloudfrontDistribution(stack, 'test-distribution');
+        new CloudfrontDistribution(stack, 'test-distribution', { ignoreRoute53: true, context });
       }).toThrow('An alb origin was configured in context.json without its dnsName value');
     });
 
@@ -154,8 +154,8 @@ describe('CloudfrontDistribution', () => {
       stack.node.setContext('stack-parms', context);
       
       expect(() => {
-        new CloudfrontDistribution(stack, 'test-distribution');
-      }).toThrow('hostedZone and certifidateARN are mutually inclusive');
+        new CloudfrontDistribution(stack, 'test-distribution', { ignoreRoute53: true, context });
+      }).toThrow('hostedZone and certificateARN are mutually inclusive');
     });
 
     it('should throw error when subdomain specified without DNS configuration', () => {
@@ -173,7 +173,7 @@ describe('CloudfrontDistribution', () => {
       stack.node.setContext('stack-parms', context);
       
       expect(() => {
-        new CloudfrontDistribution(stack, 'test-distribution');
+        new CloudfrontDistribution(stack, 'test-distribution', { ignoreRoute53: true, context });
       }).toThrow('An origin subdomain must be supported by DNS.certificateARN and DNS.hostedZone');
     });
 
@@ -196,7 +196,7 @@ describe('CloudfrontDistribution', () => {
       stack.node.setContext('stack-parms', context);
       
       expect(() => {
-        new CloudfrontDistribution(stack, 'test-distribution');
+        new CloudfrontDistribution(stack, 'test-distribution', { ignoreRoute53: true, context });
       }).toThrow('app.different.com is not a subdomain of example.com');
     });
 
@@ -221,7 +221,7 @@ describe('CloudfrontDistribution', () => {
       // This should not throw an error during validation
       expect(() => {
         // Create the distribution but prevent actual CDK resource creation
-        const dist = new CloudfrontDistribution(stack, 'test-distribution', { ignoreRoute53: true });
+        const dist = new CloudfrontDistribution(stack, 'test-distribution', { ignoreRoute53: true, context });
       }).not.toThrow(); // Should succeed with ignoreRoute53: true
     });
 
@@ -241,13 +241,13 @@ describe('CloudfrontDistribution', () => {
       
       // Should not throw validation error with ignoreRoute53: true
       expect(() => {
-        new CloudfrontDistribution(stack, 'test-distribution', { ignoreRoute53: true });
+        new CloudfrontDistribution(stack, 'test-distribution', { ignoreRoute53: true, context });
       }).not.toThrow(); // Should succeed with ignoreRoute53: true
     });
   });
 
   describe('Edge Function Scope Logic', () => {
-    it('should use stack scope for edge functions when region is us-east-1', () => {
+    it('should use distribution scope for edge functions when region is us-east-1', () => {
       const context: IContext = {
         ...createBaseMockContext(),
         REGION: 'us-east-1',
@@ -261,21 +261,22 @@ describe('CloudfrontDistribution', () => {
 
       stack.node.setContext('stack-parms', context);
       
+      let distribution: CloudfrontDistribution;
       try {
-        new CloudfrontDistribution(stack, 'test-distribution', { ignoreRoute53: true });
+        distribution = new CloudfrontDistribution(stack, 'test-distribution', { ignoreRoute53: true, context });
       } catch (e) {
         // Expected to fail due to missing resources, but we can check the calls
       }
       
-      // Edge functions should be created with stack as scope
+      // Edge functions should be created with distribution as scope
       expect(mockCreateEdgeFunctionForViewerRequest).toHaveBeenCalledWith(
-        stack,
+        distribution!,
         context,
         expect.any(Function)
       );
     });
 
-    it('should use distribution scope for edge functions when region is not us-east-1', () => {
+    it('should use distribution scope for edge functions', () => {
       const context: IContext = {
         ...createBaseMockContext(),
         REGION: 'us-west-2',
@@ -291,7 +292,7 @@ describe('CloudfrontDistribution', () => {
       
       let distribution: CloudfrontDistribution;
       try {
-        distribution = new CloudfrontDistribution(stack, 'test-distribution', { ignoreRoute53: true });
+        distribution = new CloudfrontDistribution(stack, 'test-distribution', { ignoreRoute53: true, context });
       } catch (e) {
         // Expected to fail, but we can still check the calls that happened before failure
       }
@@ -321,7 +322,7 @@ describe('CloudfrontDistribution', () => {
       stack.node.setContext('stack-parms', context);
       
       try {
-        new CloudfrontDistribution(stack, 'test-distribution', { ignoreRoute53: true });
+        new CloudfrontDistribution(stack, 'test-distribution', { ignoreRoute53: true, context });
       } catch (e) {
         // Expected to fail due to missing resources
       }
@@ -344,7 +345,7 @@ describe('CloudfrontDistribution', () => {
       stack.node.setContext('stack-parms', context);
       
       try {
-        new CloudfrontDistribution(stack, 'test-distribution', { ignoreRoute53: true });
+        new CloudfrontDistribution(stack, 'test-distribution', { ignoreRoute53: true, context });
       } catch (e) {
         // Expected to fail due to missing resources
       }
@@ -359,7 +360,7 @@ describe('CloudfrontDistribution', () => {
       stack.node.setContext('stack-parms', context);
       
       try {
-        new CloudfrontDistribution(stack, 'test-distribution', { ignoreRoute53: true });
+        new CloudfrontDistribution(stack, 'test-distribution', { ignoreRoute53: true, context });
       } catch (e) {
         // Expected to fail due to missing resources
       }
@@ -390,7 +391,7 @@ describe('CloudfrontDistribution', () => {
       const mockCreateARecord = require('./Route53').createARecord;
       
       try {
-        new CloudfrontDistribution(stack, 'test-distribution', { ignoreRoute53: true });
+        new CloudfrontDistribution(stack, 'test-distribution', { ignoreRoute53: true, context });
       } catch (e) {
         // Expected to fail due to missing resources
       }
@@ -426,7 +427,7 @@ describe('CloudfrontDistribution', () => {
 
         // This test verifies that BU_CACHE strategy is properly configured
         expect(() => {
-          const distribution = new CloudfrontDistribution(stack, 'test-distribution', { ignoreRoute53: true });
+          const distribution = new CloudfrontDistribution(stack, 'test-distribution', { ignoreRoute53: true, context });
         }).not.toThrow(); // Should succeed with mocks and ignoreRoute53: true
       });
 
@@ -446,7 +447,7 @@ describe('CloudfrontDistribution', () => {
 
         // Function URL origins should always use NO_CACHE regardless of global setting
         expect(() => {
-          const distribution = new CloudfrontDistribution(stack, 'test-distribution', { ignoreRoute53: true });
+          const distribution = new CloudfrontDistribution(stack, 'test-distribution', { ignoreRoute53: true, context });
         }).not.toThrow(); // Should succeed with mocks and ignoreRoute53: true
       });
 
@@ -466,7 +467,7 @@ describe('CloudfrontDistribution', () => {
         stack.node.setContext('stack-parms', context);
 
         expect(() => {
-          const distribution = new CloudfrontDistribution(stack, 'test-distribution', { ignoreRoute53: true });
+          const distribution = new CloudfrontDistribution(stack, 'test-distribution', { ignoreRoute53: true, context });
         }).not.toThrow(); // Should succeed with mocks and ignoreRoute53: true
       });
 
@@ -487,7 +488,7 @@ describe('CloudfrontDistribution', () => {
 
         // Test origins should always use NO_CACHE even when ALB uses different strategy
         expect(() => {
-          const distribution = new CloudfrontDistribution(stack, 'test-distribution', { ignoreRoute53: true });
+          const distribution = new CloudfrontDistribution(stack, 'test-distribution', { ignoreRoute53: true, context });
         }).not.toThrow(); // Should succeed with mocks and ignoreRoute53: true
       });
     });
@@ -514,7 +515,7 @@ describe('CloudfrontDistribution', () => {
 
         // ALB + custom domain should use ALL_VIEWER
         expect(() => {
-          const distribution = new CloudfrontDistribution(stack, 'test-distribution', { ignoreRoute53: true });
+          const distribution = new CloudfrontDistribution(stack, 'test-distribution', { ignoreRoute53: true, context });
         }).not.toThrow(); // Tests origin request policy logic
       });
 
@@ -538,7 +539,7 @@ describe('CloudfrontDistribution', () => {
 
         // Function URL + custom domain should use ALL_VIEWER_EXCEPT_HOST_HEADER
         expect(() => {
-          const distribution = new CloudfrontDistribution(stack, 'test-distribution', { ignoreRoute53: true });
+          const distribution = new CloudfrontDistribution(stack, 'test-distribution', { ignoreRoute53: true, context });
         }).not.toThrow(); // Tests origin request policy logic
       });
 
@@ -559,7 +560,7 @@ describe('CloudfrontDistribution', () => {
 
         // No custom domain should always use ALL_VIEWER_EXCEPT_HOST_HEADER
         expect(() => {
-          const distribution = new CloudfrontDistribution(stack, 'test-distribution', { ignoreRoute53: true });
+          const distribution = new CloudfrontDistribution(stack, 'test-distribution', { ignoreRoute53: true, context });
         }).not.toThrow(); // Should succeed with mocks and ignoreRoute53: true
       });
     });
@@ -585,7 +586,7 @@ describe('CloudfrontDistribution', () => {
 
         // Custom domain configuration should be properly set
         expect(() => {
-          const distribution = new CloudfrontDistribution(stack, 'test-distribution', { ignoreRoute53: true });
+          const distribution = new CloudfrontDistribution(stack, 'test-distribution', { ignoreRoute53: true, context });
         }).not.toThrow(); // Should succeed with mocks and ignoreRoute53: true
       });
 
@@ -605,7 +606,7 @@ describe('CloudfrontDistribution', () => {
 
         // Should create additional behaviors for /testing123 paths
         expect(() => {
-          const distribution = new CloudfrontDistribution(stack, 'test-distribution', { ignoreRoute53: true });
+          const distribution = new CloudfrontDistribution(stack, 'test-distribution', { ignoreRoute53: true, context });
         }).not.toThrow(); // Should succeed with mocks and ignoreRoute53: true
       });
 
@@ -639,14 +640,14 @@ describe('CloudfrontDistribution', () => {
         const stackWithCustom = new Stack(app, 'test-stack-custom');
         stackWithCustom.node.setContext('stack-parms', contextWithCustomDomain);
         expect(() => {
-          new CloudfrontDistribution(stackWithCustom, 'test-distribution-1', { ignoreRoute53: true });
+          new CloudfrontDistribution(stackWithCustom, 'test-distribution-1', { ignoreRoute53: true, context: contextWithCustomDomain });
         }).not.toThrow(); // Should succeed with mocks and ignoreRoute53: true
 
         // Test no custom domain configuration 
         const stackWithoutCustom = new Stack(app, 'test-stack-nocustom');
         stackWithoutCustom.node.setContext('stack-parms', contextWithoutCustomDomain);
         expect(() => {
-          new CloudfrontDistribution(stackWithoutCustom, 'test-distribution-2', { ignoreRoute53: true });
+          new CloudfrontDistribution(stackWithoutCustom, 'test-distribution-2', { ignoreRoute53: true, context: contextWithoutCustomDomain });
         }).not.toThrow(); // Should succeed with mocks and ignoreRoute53: true
       });
     });
@@ -668,7 +669,7 @@ describe('CloudfrontDistribution', () => {
 
         // Should recognize ALB domain pattern and apply ALB-specific logic
         expect(() => {
-          const distribution = new CloudfrontDistribution(stack, 'test-distribution', { ignoreRoute53: true });
+          const distribution = new CloudfrontDistribution(stack, 'test-distribution', { ignoreRoute53: true, context: contextAlb });
         }).not.toThrow(); // Should succeed with mocks and ignoreRoute53: true
       });
 
@@ -687,7 +688,7 @@ describe('CloudfrontDistribution', () => {
 
         // Should apply Function URL specific logic (always NO_CACHE)
         expect(() => {
-          const distribution = new CloudfrontDistribution(stack, 'test-distribution', { ignoreRoute53: true });
+          const distribution = new CloudfrontDistribution(stack, 'test-distribution', { ignoreRoute53: true, context: contextFunctionUrl });
         }).not.toThrow(); // Should succeed with mocks and ignoreRoute53: true
       });
     });

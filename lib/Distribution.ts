@@ -39,22 +39,22 @@ export class CloudfrontDistribution extends Construct {
   private cloudFrontDistribution:Distribution;
   private buCachePolicy:CachePolicy|undefined;
 
-  constructor(stack: Construct, stackName: string, props?: {
+  constructor(stack: Construct, stackName: string, props: {
     httpOriginBase?: HttpOriginBase,
-    ignoreRoute53: boolean 
+    ignoreRoute53: boolean,
+    context: IContext
   }) {
     
     super(stack, stackName);
 
     this.stack = stack;
 
-    this.context = stack.node.getContext('stack-parms');
-    
-    const { context } = this;
     const { validateContext, createDistribution, edgeLambdas } = this;
-    const { REGION, ORIGIN } = context;
+    const { context, context: { REGION, ORIGIN } } = props!;
     const { originType } = (ORIGIN ?? {} as Origin);
     const { ignoreRoute53=false, httpOriginBase } = props || {};
+
+    this.context = context;
 
     // 1) Validate context parameters
     validateContext();

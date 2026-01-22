@@ -125,7 +125,8 @@ export class ShibbolethAtEdgeConstruct extends Construct {
     const distributionId = scope.node.id.endsWith('Stack') ? scope.node.id : 'Distribution';
     new CloudfrontDistribution(scope, distributionId, {
       ignoreRoute53: ShibbolethAtEdgeConstruct.ignoreRoute53,
-      httpOriginBase: this.props.httpOriginBase
+      httpOriginBase: this.props.httpOriginBase,
+      context
     });
   }
 
