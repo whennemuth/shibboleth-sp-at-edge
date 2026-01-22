@@ -36,7 +36,7 @@ export type DNS = {
 
 export interface OriginFunctionUrl extends Origin {
     originType: OriginType.FUNCTION_URL;
-    url?:       String
+    url?:       string
 };
 export interface OriginAlb extends Origin {
     originType: OriginType.ALB;
