@@ -5,9 +5,11 @@ import {
   Route53Client,
   HostedZone as Route53HostedZone
 } from "@aws-sdk/client-route-53";
+import { GetParameterCommand, SSMClient } from "@aws-sdk/client-ssm";
 import { Distribution } from "aws-cdk-lib/aws-cloudfront";
 import { ARecord, ARecordProps, HostedZone, RecordTarget, } from "aws-cdk-lib/aws-route53";
 import { CloudFrontTarget } from "aws-cdk-lib/aws-route53-targets";
+import { StringParameter } from "aws-cdk-lib/aws-ssm";
 import { Construct } from "constructs";
 import { IContext } from '../context/IContext';
 import * as ctx from '../context/context.json';
@@ -24,27 +26,50 @@ export type CreateARecordParameters = {
 }
 
 /**
- * Create a breadcrumb to add to the ARecord comment to identify the stack that created the resource.
- * @returns The breadcrumb comment
- */
-const getBreadCrumb = ():string => {
-  const stackName = getStackName(context);
-  return `CREATED_BY: ${stackName}`;
-}
-
-/**
  * Add an A record to the hosted zone that targets the provided distribution.
  * @param parms 
  */
 export const createARecord = (parms:CreateARecordParameters) => {
   const { distribution, hostedZone, id, recordName, scope } = parms;
-  new ARecord(scope, id, {
+  
+  // Create the A record
+  const aRecord = new ARecord(scope, id, {
     target: RecordTarget.fromAlias(new CloudFrontTarget(distribution)),
     zone: HostedZone.fromLookup(scope, `${id}hostedzone`, { domainName: hostedZone }),
-    comment: `A Record for distribution: ${distribution.distributionId} - ${getBreadCrumb()}`,
+    comment: `A Record for distribution: ${distribution.distributionId}`,
     recordName
   } as ARecordProps);
+
+  // Create an SSM parameter to track ownership
+  const stackName = getStackName(context);
+  new StringParameter(aRecord, `${id}-ownership`, {
+    parameterName: `/route53/arecords/${recordName}`,
+    stringValue: stackName,
+    description: `Tracks that A record ${recordName} was created by stack ${stackName}`
+  });
 }
+
+/**
+ * Check if an A record was created by this stack by looking up the corresponding SSM parameter.
+ * @param recordName The name of the A record
+ * @param region AWS region
+ * @returns true if the record was created by this stack
+ */
+const checkIfCreatedByThisStack = async (recordName: string, region: string): Promise<boolean> => {
+  try {
+    const ssmClient = new SSMClient({ region });
+    const parameterName = `/route53/arecords/${recordName}`;
+    
+    const command = new GetParameterCommand({ Name: parameterName });
+    const response = await ssmClient.send(command);
+    
+    const stackName = getStackName(context);
+    return response.Parameter?.Value === stackName;
+  } catch (error) {
+    // Parameter doesn't exist or other error - assume not created by this stack
+    return false;
+  }
+};
 
 /**
  * Find an A record by its name in the specified hosted zone that also has evidence it was created by this stack.
@@ -91,11 +116,8 @@ export const findARecord = async (hostedZoneName: string, recordName: string, re
       return { recordSet: null, hostedZoneId: hostedZone.Id || null, createdByThisStack: false };
     }
 
-    // Step 4: Check if this record was created by this stack
-    const stackName = getStackName(context);
-    const createdByThisStack = aRecord.ResourceRecords?.some(record => 
-      record.Value?.includes(getBreadCrumb())
-    ) || false;
+    // Step 4: Check if this record was created by this stack via SSM parameter
+    const createdByThisStack = await checkIfCreatedByThisStack(recordName, region);
 
     return { 
       recordSet: aRecord, 
@@ -137,3 +159,20 @@ export const findHostedZoneByName = async (domainName: string, region: string): 
     throw error;
   }
 };
+
+
+if (require.main === module) {
+  (async () => {
+    const hostedZoneName = 'cssnprd.warhen.work';
+    const recordName = 'huron1.cssnprd.warhen.work';
+    const region = ctx.REGION;
+
+    const result = await findARecord(hostedZoneName, recordName, region);
+    if (result.recordSet) {
+      console.log(`A Record found: ${JSON.stringify(result.recordSet, null, 2)}`);
+      console.log(`Created by this stack: ${result.createdByThisStack}`);
+    } else {
+      console.log('A Record not found.');
+    }
+  })();
+}
