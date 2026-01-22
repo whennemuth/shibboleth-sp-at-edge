@@ -110,12 +110,17 @@ export class ShibbolethAtEdgeConstruct extends Construct {
         construct.tags.setTag(key, value);
       }
 
-      // Apply standard tags to all resources
-      const { TAGS: { Landscape, Function, Service, CostCenter='', Ticket='' } } = context;
-      const standardTags = { Service, Function, Landscape, CostCenter, Ticket };
-      new TaggingAspect(construct, standardTags).applyTags({ 
-        aspect: new BU_NameTagAspect(standardTags) 
-      });
+      // Determine if this code is running from an installed package
+      const isInstalled = __dirname.includes('node_modules');
+
+      if( ! isInstalled ) {
+        // Apply standard tags to all resources
+        const { TAGS: { Landscape, Function, Service, CostCenter='', Ticket='' } } = context;
+        const standardTags = { Service, Function, Landscape, CostCenter, Ticket };
+        new TaggingAspect(construct, standardTags).applyTags({ 
+          aspect: new BU_NameTagAspect(standardTags) 
+        });
+      }
     }
 
     // Set context for the construct
@@ -123,7 +128,7 @@ export class ShibbolethAtEdgeConstruct extends Construct {
 
     // Create the CloudFront distribution (context is already validated)
     const distributionId = scope.node.id.endsWith('Stack') ? scope.node.id : 'Distribution';
-    new CloudfrontDistribution(scope, distributionId, {
+    this._cloudfrontDistribution = new CloudfrontDistribution(scope, distributionId, {
       ignoreRoute53: ShibbolethAtEdgeConstruct.ignoreRoute53,
       httpOriginBase: this.props.httpOriginBase,
       context
