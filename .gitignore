@@ -3,6 +3,7 @@ context/context.bkp.*
 
 # Build artifacts
 dist/*
+build/*
 *.d.ts
 *.tgz
 

@@ -1,7 +1,6 @@
 import { EdgeLambda, LambdaEdgeEventType, experimental } from "aws-cdk-lib/aws-cloudfront";
 import { Effect, PolicyStatement } from "aws-cdk-lib/aws-iam";
 import { Code, Runtime } from "aws-cdk-lib/aws-lambda";
-import { NodejsFunction } from "aws-cdk-lib/aws-lambda-nodejs";
 import { IContext } from "../context/IContext";
 import { Construct } from "constructs";
 import path = require("path");
@@ -32,65 +31,27 @@ const getEdgeFunctionLoggingPolicy = ():PolicyStatement => {
 }
 
 /**
- * Create the Lambda@Edge origin request function.
- * It can be bundled as normal because the stack is in the correct region.
- */
-const createSameRegionEdgeFunction = (stack:Construct, context:IContext):NodejsFunction => {
-  const { STACK_ID, TAGS: { Landscape} } = context;
-  const ftn = new NodejsFunction(stack, 'edge-function-origin-request', {
-    runtime: Runtime.NODEJS_18_X,
-    entry: 'lib/lambda/FunctionSpOriginRequest.ts',
-    functionName: `${STACK_ID}-${Landscape}-${EDGE_REQUEST_ORIGIN_FUNCTION_BASENAME}`,
-    bundling: {
-      externalModules: [ '@aws-sdk/*' ],
-    }
-  });
-  ftn.addToRolePolicy(getEdgeFunctionSecretsManagerPolicy());
-  ftn.addToRolePolicy(getEdgeFunctionLoggingPolicy());
-  return ftn;
-};
-
-/**
- * Create the Lambda@Edge origin request function.
- * It must be created in us-east-1, which, since this stack is NOT being
- * created in us-east-1, requires the experimental EdgeFunction and a prebundled code asset.
- * SEE: https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/lambda-at-edge-function-restrictions.html
+ * Create the Lambda@Edge origin request function using pre-built assets.
  *  
- * NOTE: If target origins are ALBs that exist in regions other than us-east-1, but this stack is to 
- * nonetheless to be deployed in us-east-1, the requests incoming to the ALB will not match the prefix list 
- * "com.amazonaws.global.cloudfront.origin-facing" for the region the ALB is in. This is because such prefix
- * lists are region-specific and not global. If this problem is solved and the ALB can be assigned a security
- * group that allows ingress from a cloudfront distribution (the one created by this stack) that is in a 
- * different region, then this use of the experimental edge function can be removed and this stack can be 
- * created in us-east-1 regardless of the target ALB origin region. 
- * 
  * @param scope 
  * @param context 
+ * @param callback
  * @returns 
  */
-const createCrossRegionEdgeFunction = (scope:Construct, context:IContext):experimental.EdgeFunction => {
+export const createEdgeFunctionForOriginRequest = (scope:Construct, context:IContext, callback:(lambda:EdgeLambda) => void) => {
   const { STACK_ID, TAGS: { Landscape} } = context;
-  const { EDGE_ORIGIN_REQUEST_CODE_FILE:outfile } = CloudfrontDistribution
-  const ftn = new experimental.EdgeFunction(scope, 'edge-function-origin-request', {
+  const { EDGE_ORIGIN_REQUEST_ID } = CloudfrontDistribution;
+
+  const isInstalled = __dirname.includes('node_modules');
+  const buildPath = isInstalled ? '../../../build' : '../build';
+  const edgeFunction = new experimental.EdgeFunction(scope, EDGE_ORIGIN_REQUEST_ID, {
     runtime: Runtime.NODEJS_18_X,
-    handler: 'index.handler',
-    code: Code.fromAsset(path.join(__dirname, `../${path.dirname(outfile)}`)),
+    handler: `${EDGE_ORIGIN_REQUEST_ID}.handler`,
+    code: Code.fromAsset(path.resolve(__dirname, buildPath)),
     functionName: `${STACK_ID}-${Landscape}-${EDGE_REQUEST_ORIGIN_FUNCTION_BASENAME}`
   });
-  ftn.addToRolePolicy(getEdgeFunctionSecretsManagerPolicy());
-  ftn.addToRolePolicy(getEdgeFunctionLoggingPolicy());
-  return ftn;
-}
-
-export const createEdgeFunctionForOriginRequest = (scope:Construct, context:IContext, callback:(lambda:EdgeLambda) => void) => {
-  const { REGION } = context;
-  let edgeFunction:NodejsFunction|experimental.EdgeFunction;
-  if(REGION == 'us-east-1') {
-    edgeFunction = createSameRegionEdgeFunction(scope, context);
-  }
-  else {
-    edgeFunction = createCrossRegionEdgeFunction(scope, context);
-  }
+  edgeFunction.addToRolePolicy(getEdgeFunctionSecretsManagerPolicy());
+  edgeFunction.addToRolePolicy(getEdgeFunctionLoggingPolicy());
 
   callback({
     eventType: LambdaEdgeEventType.ORIGIN_REQUEST,

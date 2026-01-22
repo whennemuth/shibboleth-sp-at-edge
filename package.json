@@ -17,7 +17,8 @@
     "redeploy": "cdk destroy --all -f && npm run deploy --all",
     "get-stack-name": "ts-node -e \"require('./lib/Util.ts').echoStackName()\"",
     "synth": "npm run get-stack-name | xargs cdk synth 2>&1 | tee cdk.out/synth.output.yaml",
-    "build": "rm -rf dist/ && npm run build:esm && npm run build:cjs",
+    "prebuild:lambda": "esbuild lib/lambda/FunctionSpViewerRequest.ts --bundle --platform=node --outfile=build/edge-viewer-request.js && esbuild lib/lambda/FunctionSpOriginRequest.ts --bundle --platform=node --external:@aws-sdk/* --outfile=build/edge-origin-request.js && esbuild lib/lambda/FunctionSpViewerResponse.ts --bundle --platform=node --outfile=build/edge-viewer-response.js",
+    "build": "npm run prebuild:lambda && rm -rf dist/ && npm run build:esm && npm run build:cjs",
     "build:tsc": "rm -rf dist/ && npm run build:esm && npm run build:cjs",
     "build:esm": "tsc",
     "build:cjs": "tsc --project tsconfig.cjs.json",
@@ -27,7 +28,8 @@
   "main": "dist/cjs/bin/build/index.js",
   "types": "dist/types/bin/build/index.d.ts",
   "files": [
-    "dist"
+    "dist",
+    "build/"
   ],
   "dependencies": {
     "@aws-sdk/client-secrets-manager": "^3.577.0",

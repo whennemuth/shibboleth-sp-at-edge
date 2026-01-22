@@ -22,9 +22,13 @@ import path = require('path');
  */
 export class CloudfrontDistribution extends Construct {
   // The path of the edge lambda code asset relative to the root of the project
-  public static EDGE_VIEWER_REQUEST_CODE_FILE:string = 'cdk.out/asset.viewer.request/index.js';
-  public static EDGE_VIEWER_RESPONSE_CODE_FILE:string = 'cdk.out/asset.viewer.response/index.js';
-  public static EDGE_ORIGIN_REQUEST_CODE_FILE:string = 'cdk.out/asset.origin.request/index.js';
+  public static EDGE_VIEWER_REQUEST_ID:string = 'edge-viewer-request';
+  public static EDGE_ORIGIN_REQUEST_ID:string = 'edge-origin-request';
+  public static EDGE_VIEWER_RESPONSE_ID:string = 'edge-viewer-response';
+
+  public static EDGE_VIEWER_REQUEST_CODE_FILE:string = `build/${CloudfrontDistribution.EDGE_VIEWER_REQUEST_ID}.js`;
+  public static EDGE_VIEWER_RESPONSE_CODE_FILE:string = `build/${CloudfrontDistribution.EDGE_VIEWER_RESPONSE_ID}.js`;
+  public static EDGE_ORIGIN_REQUEST_CODE_FILE:string = `build/${CloudfrontDistribution.EDGE_ORIGIN_REQUEST_ID}.js`;
   
   private stack:Construct;
   private context:IContext;
@@ -56,7 +60,7 @@ export class CloudfrontDistribution extends Construct {
     validateContext();
 
     // 2) Create lambda@Edge functions
-    const scope = REGION == 'us-east-1' ? stack : this;
+    const scope = this;
     createEdgeFunctionForViewerRequest(scope, context, (edgeLambda:any) => {
       edgeLambdas.push(edgeLambda);
     });

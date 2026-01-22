@@ -2,7 +2,6 @@ import { RemovalPolicy, Stack } from 'aws-cdk-lib';
 import { RetentionDays } from 'aws-cdk-lib/aws-logs';
 import { CustomResourceConfig } from 'aws-cdk-lib/custom-resources';
 import { Construct } from 'constructs';
-import { BuildOptions, build } from 'esbuild';
 import { CloudFrontCachingStrategy, IContext, OriginAlb, OriginType, SecretFieldNames } from '../context/IContext';
 import { CloudfrontDistribution } from './Distribution';
 import { albExists } from './OriginAlb';
@@ -171,9 +170,6 @@ export class ShibbolethAtEdgeConstruct extends Construct {
     
     // Validate secret exists
     await ShibbolethAtEdgeConstruct.validateSecret(secretArn, region);
-
-    // Build Lambda@Edge functions if not in us-east-1
-    await ShibbolethAtEdgeConstruct.buildEdgeFunctions(region);
     
     return context;
   }
@@ -204,68 +200,6 @@ export class ShibbolethAtEdgeConstruct extends Construct {
         `\nthe ./.env file as directed in the README and running ` +
         `\nnpm run create-secrets`);
       process.exit(1);
-    }
-  }
-
-  /**
-   * Builds the Lambda@Edge functions when deploying outside us-east-1
-   */
-  private static async buildEdgeFunctions(region: string): Promise<void> {
-    // Check the region
-    if( region != 'us-east-1' ) {
-
-      // Gotta build the lambda code asset manually due to using EdgeLambda instead of NodejsFunction
-      const { 
-        EDGE_VIEWER_REQUEST_CODE_FILE,
-        EDGE_ORIGIN_REQUEST_CODE_FILE, 
-        EDGE_VIEWER_RESPONSE_CODE_FILE 
-      } = CloudfrontDistribution
-
-      // Build viewer request.
-      const viewerRequestBuildResult = await build({
-        entryPoints: ['lib/lambda/FunctionSpViewerRequest.ts'],
-        write: true,
-        outfile: EDGE_VIEWER_REQUEST_CODE_FILE,
-        bundle: true,
-        platform: 'node'
-      } as BuildOptions);
-
-      // Abort if there were build errors
-      (viewerRequestBuildResult.errors || []).forEach((error) => {
-        console.error(`Error building viewer request: ${error}`);
-        process.exit(1);
-      });
-
-      // Build viewer response.
-      const originRequestBuildResult = await build({
-        entryPoints: ['lib/lambda/FunctionSpOriginRequest.ts'],
-        write: true,
-        outfile: EDGE_ORIGIN_REQUEST_CODE_FILE,
-        bundle: true,
-        platform: 'node',
-        external: ['@aws-sdk/*']
-      } as BuildOptions);
-
-      // Abort if there were build errors
-      (originRequestBuildResult.errors || []).forEach((error) => {
-        console.error(`Error building origin request: ${error}`);
-        process.exit(1);
-      });
-
-      // Build origin request.
-      const viewerResponseBuildResult = await build({
-        entryPoints: ['lib/lambda/FunctionSpViewerResponse.ts'],
-        write: true,
-        outfile: EDGE_VIEWER_RESPONSE_CODE_FILE,
-        bundle: true,
-        platform: 'node'
-      } as BuildOptions);
-
-      // Abort if there were build errors
-      (viewerResponseBuildResult.errors || []).forEach((error) => {
-        console.error(`Error building viewer response: ${error}`);
-        process.exit(1);
-      });
     }
   }
 
