@@ -6,5 +6,6 @@ import { OriginType } from "../context/IContext"
  */
 export type HttpOriginBase = {
   httpOrigin: HttpOrigin,
-  originType: OriginType
+  originType: OriginType,
+  isDummyOrigin?: boolean
 }

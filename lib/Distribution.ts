@@ -312,7 +312,7 @@ export class CloudfrontDistribution extends Construct {
       defaultBehavior: getDefaultBehavior(),
     } as DistributionProps
 
-    if(origin) {
+    if(testOrigin && testOrigin.isDummyOrigin) {
       // Associate the test origin with an additional behavior
       // Test origins are always function URLs and should always use NO_CACHE
       distributionProps = Object.assign({
@@ -320,7 +320,13 @@ export class CloudfrontDistribution extends Construct {
           // https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/distribution-web-values-specify.html#DownloadDistValuesPathPattern
           '/testing123': getBehavior(testOrigin, false, true),
           '/testing123/*': getBehavior(testOrigin, false, true),
-          
+        }
+      }, distributionProps);
+    }
+
+    if(origin) {
+      distributionProps = Object.assign({
+        additionalBehaviors: {
           // SAML authentication paths - force NO_CACHE to prevent authentication issues
           [AUTH_PATHS.LOGIN]: getBehavior(origin, customDomain(), true),
           [AUTH_PATHS.LOGOUT]: getBehavior(origin, customDomain(), true),
@@ -361,6 +367,11 @@ export class CloudfrontDistribution extends Construct {
 
   public get distribution(): Distribution {
     return this.cloudFrontDistribution;
+  }
+
+  public addCustomHeaderToOrigin = (headerName:string, headerValue:string) => {
+    const { origin } = this;
+    
   }
 }
 

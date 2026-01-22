@@ -16,13 +16,30 @@ export type OriginFunctionUrlConfig = {
 
 export const getFunctionUrlOrigin = (config:OriginFunctionUrlConfig): HttpOriginBase  => {
   const { origin } = config;
+  let httpOrigin: HttpOrigin;
+  let isDummyOrigin = false;
+
   if(origin.url) {
-    throw new Error('Existing function url as origin not implemented yet.');
+    httpOrigin = getOtherLambdaAppOrigin(config);
   }
-  return { 
-    httpOrigin: getDummyLambdaAppOrigin(config), 
-    originType: OriginType.FUNCTION_URL 
-  };
+  else {
+    httpOrigin = getDummyLambdaAppOrigin(config);
+    isDummyOrigin = true;
+  }
+
+  return { httpOrigin, originType: OriginType.FUNCTION_URL, isDummyOrigin };
+}
+
+const getOtherLambdaAppOrigin = (config:OriginFunctionUrlConfig):HttpOrigin => {
+  const { origin, context: { ORIGIN: { appAuthorization=true } = { } } } = config;
+  const funcUrlOrigin = new HttpOrigin(Fn.select(2, Fn.split('/', origin.url!)), {
+    protocolPolicy: OriginProtocolPolicy.HTTPS_ONLY,
+    httpsPort: 443,
+    customHeaders: {
+      APP_AUTHORIZATION: `${appAuthorization}`
+    }       
+  } as HttpOriginProps);
+  return funcUrlOrigin;
 }
 
 /**
