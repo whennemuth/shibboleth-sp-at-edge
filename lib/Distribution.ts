@@ -1,18 +1,18 @@
 import { CfnOutput, Duration, RemovalPolicy } from 'aws-cdk-lib';
-import { AUTH_PATHS } from 'shibboleth-sp';
 import { Certificate, ICertificate } from 'aws-cdk-lib/aws-certificatemanager';
 import { AllowedMethods, BehaviorOptions, CacheCookieBehavior, CacheHeaderBehavior, CachePolicy, CachePolicyProps, CacheQueryStringBehavior, Distribution, DistributionProps, EdgeLambda, OriginRequestPolicy, PriceClass, ViewerProtocolPolicy } from 'aws-cdk-lib/aws-cloudfront';
 import { NodejsFunction } from 'aws-cdk-lib/aws-lambda-nodejs';
 import { Bucket, ObjectOwnership } from 'aws-cdk-lib/aws-s3';
 import { Construct } from 'constructs';
+import { AUTH_PATHS } from 'shibboleth-sp';
 import { CloudFrontCachingStrategy, IContext, Origin, OriginAlb, OriginFunctionUrl, OriginType } from '../context/IContext';
 import { createEdgeFunctionForOriginRequest } from './EdgeFunctionOriginRequest';
-import { createEdgeFunctionForViewerResponse } from './EdgeFunctionViewerResponse';
 import { createEdgeFunctionForViewerRequest } from './EdgeFunctionViewerRequest';
+import { createEdgeFunctionForViewerResponse } from './EdgeFunctionViewerResponse';
 import { HttpOriginBase } from './Origin';
 import { getAlbOrigin } from './OriginAlb';
 import { getFunctionUrlOrigin } from './OriginFunctionUrl';
-import { createARecord } from './Route53';
+import type { IRoute53HostedZone } from './Route53';
 import { getStackName, ParameterTester } from './Util';
 import path = require('path');
 
@@ -183,7 +183,7 @@ export class CloudfrontDistribution extends Construct {
   private createDistribution = (ignoreRoute53: boolean) => {
     const { stack, context, origin, testOrigin, edgeLambdas } = this;
     const { isNotBlank, noneBlank } = ParameterTester;
-    const { TAGS, STACK_ID, DNS, ORIGIN, APP_LOGIN_HEADER, APP_LOGOUT_HEADER } = context;
+    const { TAGS, STACK_ID, ACCOUNT, DNS, ORIGIN, APP_LOGIN_HEADER, APP_LOGOUT_HEADER } = context;
     const { hostedZone, certificateARN } = DNS || {};
     const { subdomain } = ORIGIN || {};
     const distributionName = `${STACK_ID}-cloudfront-distribution-${TAGS.Landscape}`;
@@ -355,7 +355,24 @@ export class CloudfrontDistribution extends Construct {
 
     // Create an A record in route 53 with the distribution as the target.
     if(customDomain()) {
-      createARecord({
+      const { 
+        props: { hostedZone: hostedZoneObj = {} as IRoute53HostedZone }, 
+        cloudFrontDistribution: { distributionDomainName } = {},
+      } = this;
+
+      if( ! hostedZoneObj.found) {
+        console.warn(`Hosted zone ${hostedZone} not found in this account: ${ACCOUNT}. 
+          Cannot create alias record for distribution ${distributionName}.
+          If the reason for this is because the hosted zone is in a different account,
+          you will need to create a CNAME record manually in the hosted zone of that other 
+          account with the distribution domain ${distributionDomainName} as the target, once the 
+          distribution is created after the stack is deployed. This will not prevent this app from
+          being deployed, but it will not be reachable at ${hostedZone} or any subdomains thereof 
+          until that is done.`);
+        return;
+      }
+      
+      hostedZoneObj.createARecord({
         scope:this, 
         distribution:this.cloudFrontDistribution, 
         hostedZone: hostedZone!, 

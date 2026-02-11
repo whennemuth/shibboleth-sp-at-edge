@@ -3,13 +3,15 @@ import { RetentionDays } from 'aws-cdk-lib/aws-logs';
 import { CustomResourceConfig } from 'aws-cdk-lib/custom-resources';
 import { Construct } from 'constructs';
 import { CloudFrontCachingStrategy, IContext, OriginAlb, OriginType, SecretFieldNames } from '../context/IContext';
+import { AcmCertificate } from './Certificate';
+import { ContextLog } from '../context/ContextLog';
 import { CloudfrontDistribution } from './Distribution';
+import { HttpOriginBase } from './Origin';
 import { albExists } from './OriginAlb';
-import { findARecord } from './Route53';
+import { IRoute53HostedZone, Route53HostedZone } from './Route53';
 import { SecretsManagerSecret } from './secrets/Secret';
 import { BU_NameTagAspect, TaggingAspect } from './Tagging';
 import { getClone, getStackName, logHeader } from './Util';
-import { HttpOriginBase } from './Origin';
 
 /**
  * @param scope - The parent construct (can be App, Stack, or other Construct)
@@ -38,7 +40,7 @@ export class ShibbolethAtEdgeConstruct extends Construct {
   private static ignoreRoute53: boolean = false;
 
   private _cloudfrontDistribution:CloudfrontDistribution;
-  
+
   /**
    * Static factory method that performs all async validation and setup before creating the construct.
    * Use this instead of calling the constructor directly.
@@ -133,24 +135,49 @@ export class ShibbolethAtEdgeConstruct extends Construct {
       httpOriginBase: this.props.httpOriginBase,
       context
     });
-  }
+    
+    // Store the context configuration using ContextLog (S3 storage)
+    // NOTE: If you want to change the id of this construct or name of the bucket, you must first
+    // redeploy with this code commented out (to remove it), then uncomment and redeploy again 
+    // to avoid cloudformation errors.
+    new ContextLog(this, 'context', { context, stackName:getStackName(context) });
+  }  
+
 
   /**
    * Performs all async validation and setup operations before construct creation
    */
-  private static async performAsyncSetup(contextInput: IContext): Promise<IContext> {
+  private static async performAsyncValidation(contextInput: IContext): Promise<{context:IContext, hostedZone: Route53HostedZone}> {
+    const hostedZone: Route53HostedZone = new Route53HostedZone(contextInput);
+
+    // Validate usage of ALB vs Function URL.
+    let context = 
+    await ShibbolethAtEdgeConstruct.validateAlb(contextInput);
+
+    // Validate potential A record conflicts in Route53. 
+    await ShibbolethAtEdgeConstruct.validateARecord(hostedZone);
+    
+    // Validate secret exists
+    await ShibbolethAtEdgeConstruct.validateSecret(context);
+
+    // Validate certificate exists if specified
+    await ShibbolethAtEdgeConstruct.validateCertificate(context);
+    
+    return { context, hostedZone };
+  }
+
+  /**
+   * Validate the ALB exists if specified, and switch to Function URL if not. This allows the 
+   * stack to be deployed even if the ALB is not yet available, which can be the case if the 
+   * ALB is created in a separate stack that has not been deployed yet.
+   * @param contextInput 
+   * @returns 
+   */
+  private static async validateAlb(contextInput: IContext): Promise<IContext> {
     // Get an object that can be mutated.
     let context = getClone<IContext>(contextInput);
 
-    const { 
-      ACCOUNT: account, 
-      REGION: region,
-      SHIBBOLETH: { secret: { secretArn } },
-      ORIGIN, 
-      ORIGIN: { subdomain } = {},
-      DNS: { hostedZone } = {}
-    } = context;
-
+    const { REGION: region, ORIGIN, } = context;
     const dnsName = (ORIGIN as OriginAlb)?.dnsName;
 
     // Check if ALB exists and switch to Function URL if needed
@@ -166,24 +193,31 @@ export class ShibbolethAtEdgeConstruct extends Construct {
       context.CLOUDFRONT_CACHING_STRATEGY = CloudFrontCachingStrategy.NO_CACHE;
     }
 
-    // Find out if an A record for the subdomain already exists AND was not created by this stack.
+    return context;
+  }
+
+  /**
+   * Find out if an A record for the subdomain already exists AND was not created by this stack.
+   * @param context 
+   */
+  private static async validateARecord(route53HostedZone: Route53HostedZone): Promise<void> {
+    const { REGION: region, ORIGIN: { subdomain } = {}, DNS: { hostedZone } = {}
+    } = route53HostedZone.context;
+
     if( subdomain && hostedZone ) {
-      const record = await findARecord(hostedZone, subdomain, region);
-      if(record.recordSet && ! record.createdByThisStack) {
+      const record = await route53HostedZone.findARecord(subdomain);
+      const { createdByThisStack, hostedZoneId, recordSet} = record ?? {};
+      if(recordSet && ! createdByThisStack) {
         ShibbolethAtEdgeConstruct.ignoreRoute53 = true;
       }
     }
-    
-    // Validate secret exists
-    await ShibbolethAtEdgeConstruct.validateSecret(secretArn, region);
-    
-    return context;
   }
 
   /**
    * Validates that the required Secrets Manager secret exists
    */
-  private static async validateSecret(secretArn: string, region: string): Promise<void> {
+  private static async validateSecret(context: IContext): Promise<void> {
+    const { SHIBBOLETH: { secret: { secretArn } = {} } = {}, REGION: region } = context;
     if( secretArn ) {
       // Make sure it exists.
       const exists = await new SecretsManagerSecret({ 
@@ -207,6 +241,40 @@ export class ShibbolethAtEdgeConstruct extends Construct {
         `\nnpm run create-secrets`);
       process.exit(1);
     }
+  }
+
+  private static async validateCertificate(context: IContext): Promise<void> {
+    let failures = 0;
+    const cert = new AcmCertificate(context);
+    const { DNS: { certificateARN, hostedZone } = {} } = context;
+
+    // First check the non-async validations that can be performed just based on the ARN format and context values. 
+    // This way we can provide more complete feedback to the user in one go instead of failing on the first check and making them fix things iteratively.
+    failures += cert.isValidArn ? 0 : 1;
+    failures += cert.isInThisAccount ? 0 : 1;
+    failures += cert.isInUsEast1 ? 0 : 1;
+    
+    if( failures > 0 ) {
+      logHeader('CERTIFICATE VALIDATION ERROR!!!');
+      console.error(`The provided certificate ARN ${certificateARN} did not pass validation for use with this construct. ` +
+        `\nPlease review the following messages for details:\n${cert.messages}`);
+      process.exit(1);
+    }
+
+    if( !await cert.exists() ) {
+      logHeader('CERTIFICATE VALIDATION ERROR!!!');
+      console.error(`The certificate with ARN ${certificateARN} does not exist. ` +
+        `\nPlease ensure the certificate exists and is valid, and that the ARN is correct. Validation messages: \n${cert.messages}`);
+      process.exit(1);
+    }
+
+    if( ! await cert.reflectsHostedZoneDomain() ) {
+      logHeader('CERTIFICATE VALIDATION WARNING!!!');
+      console.warn(`The certificate with ARN ${certificateARN} does not appear to reflect the hosted zone domain ${hostedZone}. ` +
+        `\nThis may cause issues when creating the CloudFront distribution. Validation messages: \n${cert.messages}`);
+    }
+
+    console.log(cert.messages);
   }
 
   public get cloudfrontDistribution(): CloudfrontDistribution {

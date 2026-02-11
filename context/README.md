@@ -2,12 +2,15 @@
 
 CDK stack deployment imports a [Runtime Context](https://docs.aws.amazon.com/cdk/v2/guide/context.html) for configuration details.
 This context is configured in a context.json file and the content of this file is cast to a type found in IContext.ts.
+Every time this app is deployed, the exact state of the context.json file is stored in SSM Parameter Store for reference.
 In order to create IContext.ts or modify it to reflect changes to `./context/context.json` run the following:
 
 ```
 cd context/
 quicktype context.json -o IContext.ts
 ```
+
+***NOTE**: After deployment, the ContextLog construct automatically stores a copy of the context.json file used for the deployment in an S3 bucket. This allows you to retrieve the exact configuration that was used to create or update your stack, which is useful for auditing, troubleshooting, or reproducing deployments. The bucket name follows the pattern `{stack-name}-context-config-{account-id}-{region}` and contains the context file at the root level.*
 
 #### Overview:
 

@@ -26,9 +26,9 @@ The following outlines the necessary prerequisites, configuration steps, and dep
    - `DNS.hostedZone`: Set this to the Route 53 hosted zone name (e.g., `example.edu`).
    - `DNS.certificateArn`: Set this to the ARN of an existing ACM certificate in us-east-1 that covers the desired domain/subdomain (e.g., `wp.example.edu`). *NOTE: This certificate must be in us-east-1 as CloudFront only supports ACM certificates from that region.*
 
-   NOTE: If you do not have a custom domain set up, blank out both of these properties as empty strings (`""`).
+   NOTE: If you do not have a custom domain set up in Route 53, blank out both of these properties as empty strings (`""`).
 
-   NOTE: If you have a custom domain set up, but have no matching certificate in ACM, go to the ACM serice in the AWS management console in us-east-1 and request it before proceeding.
+   NOTE: If you have a custom domain set up in Route 53, but have no matching certificate in ACM, go to the ACM serice in the AWS management console in us-east-1 and request it before proceeding, or use the AWS CLI - a full writeup on all of the CLI calls you may need to make for ACM certificate management can be found [here](./docs/acm.md).
 
 8. Secrets Manager:
    - In `./context/context.json`, replace the placeholder value for the `SHIBBOLETH.secret.secretArn` as per step 6 in the **[Main Readme File](../README.md)**.

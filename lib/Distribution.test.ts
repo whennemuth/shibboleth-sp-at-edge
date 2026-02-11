@@ -3,12 +3,28 @@ import { CloudFrontCachingStrategy, IContext, OriginAlb, OriginType } from '../c
 import { CloudfrontDistribution } from './Distribution';
 import { HttpOriginBase } from './Origin';
 
+// Import the type before mocking
+import type { IRoute53HostedZone } from './Route53';
+
 jest.mock('./EdgeFunctionOriginRequest');
 jest.mock('./EdgeFunctionViewerRequest');
 jest.mock('./EdgeFunctionViewerResponse');
 jest.mock('./OriginAlb');
 jest.mock('./OriginFunctionUrl');
-jest.mock('./Route53');
+jest.mock('./Route53', () => ({
+  createARecord: jest.fn(),
+  Route53HostedZone: jest.fn().mockImplementation((context) => ({
+    found: true,
+    context,
+    exists: jest.fn().mockResolvedValue(true),
+    createARecord: jest.fn(),
+    findARecord: jest.fn().mockResolvedValue({ recordSet: null, hostedZoneId: null, createdByThisStack: false }),
+    recordCreatedByThisStack: jest.fn().mockResolvedValue(false),
+    getHostedZone: jest.fn().mockResolvedValue(undefined),
+    hostedZone: undefined,
+    messages: '',
+  })),
+}));
 
 // Import mocked modules
 import { createEdgeFunctionForOriginRequest } from './EdgeFunctionOriginRequest';
@@ -16,6 +32,7 @@ import { createEdgeFunctionForViewerRequest } from './EdgeFunctionViewerRequest'
 import { createEdgeFunctionForViewerResponse } from './EdgeFunctionViewerResponse';
 import { getAlbOrigin } from './OriginAlb';
 import { getFunctionUrlOrigin } from './OriginFunctionUrl';
+import { Route53HostedZone } from './Route53';
 
 // Cast to jest mocks
 const mockCreateEdgeFunctionForOriginRequest = createEdgeFunctionForOriginRequest as jest.MockedFunction<typeof createEdgeFunctionForOriginRequest>;
@@ -397,6 +414,45 @@ describe('CloudfrontDistribution', () => {
       }
       
       expect(mockCreateARecord).not.toHaveBeenCalled();
+    });
+
+    it('should not create Route53 A record when hosted zone is not found', () => {
+      const context: IContext = {
+        ...createBaseMockContext(),
+        DNS: {
+          hostedZone: 'example.com',
+          certificateARN: 'arn:aws:acm:us-east-1:123456789012:certificate/test'
+        },
+        ORIGIN: {
+          originType: OriginType.FUNCTION_URL,
+          stackId: 'test',
+          httpsPort: 443,
+          appAuthorization: true,
+          subdomain: 'app.example.com'
+        }
+      };
+
+      stack.node.setContext('stack-parms', context);
+      
+      const mockHostedZone = {
+        found: false,
+        createARecord: jest.fn(),
+        exists: jest.fn(),
+        findARecord: jest.fn(),
+        recordCreatedByThisStack: jest.fn(),
+        getHostedZone: jest.fn(),
+        hostedZone: undefined,
+        messages: '',
+        context
+      };
+      
+      try {
+        new CloudfrontDistribution(stack, 'test-distribution', { ignoreRoute53: false, context, hostedZone: mockHostedZone });
+      } catch (e) {
+        // Expected to fail due to missing resources
+      }
+      
+      expect(mockHostedZone.createARecord).not.toHaveBeenCalled();
     });
   });
 
