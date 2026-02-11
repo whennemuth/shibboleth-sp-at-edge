@@ -21,7 +21,7 @@ export const createEdgeFunctionForViewerResponse = (scope:Construct, context:ICo
   const isInstalled = __dirname.includes('node_modules');
   const buildPath = isInstalled ? '../../../build' : '../build';
   const edgeFunction = new experimental.EdgeFunction(scope, EDGE_VIEWER_RESPONSE_ID, {
-    runtime: Runtime.NODEJS_18_X,
+    runtime: Runtime.NODEJS_22_X,
     handler: `${EDGE_VIEWER_RESPONSE_ID}.handler`,
     code: Code.fromAsset(path.resolve(__dirname, buildPath)),
     functionName: `${STACK_ID}-${Landscape}-${EDGE_RESPONSE_VIEWER_FUNCTION_BASENAME}`

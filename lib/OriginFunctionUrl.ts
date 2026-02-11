@@ -53,7 +53,7 @@ const getDummyLambdaAppOrigin = (config:OriginFunctionUrlConfig):HttpOrigin => {
 
   // Simple lambda-based web app
   const appFunction = new NodejsFunction(stack, 'AppFunction', {
-    runtime: Runtime.NODEJS_18_X,
+    runtime: Runtime.NODEJS_22_X,
     entry: 'lib/lambda/FunctionApp.ts',
     timeout: Duration.seconds(10),
     functionName: `${STACK_ID}-${Landscape}-app-function`,
