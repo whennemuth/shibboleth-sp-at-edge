@@ -52,7 +52,7 @@ const getDummyLambdaAppOrigin = (config:OriginFunctionUrlConfig):HttpOrigin => {
   const { appAuthorization=true } = ORIGIN || {};
 
   // Simple lambda-based web app
-  const appFunction = new NodejsFunction(stack, 'AppFunction', {
+  const appFunction = new NodejsFunction(stack, 'app-function', {
     runtime: Runtime.NODEJS_22_X,
     entry: 'lib/lambda/FunctionApp.ts',
     timeout: Duration.seconds(10),

@@ -84,7 +84,7 @@ export class ShibbolethAtEdgeConstruct extends Construct {
     
     const stack = new Stack(scope, stackName, {
       stackName,
-      description: 'Lambda-based shibboleth service provider',
+      description: `Lambda-based shibboleth service provider - Context configuration stored in S3`,
       env: { account, region },
       tags: { Service, Function, Landscape, CostCenter, Ticket },
     });
@@ -135,8 +135,8 @@ export class ShibbolethAtEdgeConstruct extends Construct {
     this.node.setContext('stack-parms', context);
 
     // Create the CloudFront distribution (context is already validated)
-    const distributionId = scope.node.id.endsWith('Stack') ? scope.node.id : 'Distribution';
-    this._cloudfrontDistribution = new CloudfrontDistribution(scope, distributionId, {
+    const distributionId = scope.node.id.endsWith('Stack') ? scope.node.id : 'distribution';
+    this._cloudfrontDistribution = new CloudfrontDistribution(this, distributionId, {
       ignoreRoute53: ShibbolethAtEdgeConstruct.ignoreRoute53,
       httpOriginBase: this.props.httpOriginBase,
       context,

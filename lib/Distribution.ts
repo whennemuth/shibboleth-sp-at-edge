@@ -39,7 +39,7 @@ export class CloudfrontDistribution extends Construct {
   private cloudFrontDistribution:Distribution;
   private buCachePolicy:CachePolicy|undefined;
 
-  constructor(stack: Construct, stackName: string, props: {
+  constructor(stack: Construct, stackName: string, private props: {
     httpOriginBase?: HttpOriginBase,
     ignoreRoute53: boolean,
     context: IContext,
@@ -51,7 +51,7 @@ export class CloudfrontDistribution extends Construct {
     this.stack = stack;
 
     const { validateContext, createDistribution, edgeLambdas } = this;
-    const { context, context: { REGION, ORIGIN } } = props!;
+    const { context, context: { ORIGIN } } = props!;
     const { originType } = (ORIGIN ?? {} as Origin);
     const { ignoreRoute53=false, httpOriginBase } = props || {};
 
@@ -303,7 +303,7 @@ export class CloudfrontDistribution extends Construct {
     // Configure distribution properties
     let distributionProps = {
       priceClass: PriceClass.PRICE_CLASS_100,
-      logBucket: new Bucket(stack, `${distributionName}-logs-bucket`, {
+      logBucket: new Bucket(stack, 'logs-bucket', {
         removalPolicy: RemovalPolicy.DESTROY,    
         autoDeleteObjects: true,
         objectOwnership: ObjectOwnership.OBJECT_WRITER
@@ -339,7 +339,7 @@ export class CloudfrontDistribution extends Construct {
     
     // Extend distribution properties to include certificate and domain if indicated.
     if( customDomain()) {
-      const certificate:ICertificate = Certificate.fromCertificateArn(this, `${distributionName}-acm-cert`, certificateARN!);
+      const certificate:ICertificate = Certificate.fromCertificateArn(this, 'acm-cert', certificateARN!);
       distributionProps = Object.assign({
         certificate, 
         domainNames: subdomains
@@ -347,7 +347,7 @@ export class CloudfrontDistribution extends Construct {
     }
 
     // Create the cloudFront distribution
-    this.cloudFrontDistribution = new Distribution(stack, distributionName, distributionProps);
+    this.cloudFrontDistribution = new Distribution(this, 'cloudfront-distribution', distributionProps);
 
     if(ignoreRoute53) {
       console.log(`Ignoring Route53 A record creation for distribution ${distributionName} as instructed.`);
@@ -377,7 +377,7 @@ export class CloudfrontDistribution extends Construct {
         scope:this, 
         distribution:this.cloudFrontDistribution, 
         hostedZone: hostedZone!, 
-        id: `${distributionName}-ARecord`,
+        id: 'ARecord',
         recordName: subdomains[0]
       });
     }
@@ -385,11 +385,6 @@ export class CloudfrontDistribution extends Construct {
 
   public get distribution(): Distribution {
     return this.cloudFrontDistribution;
-  }
-
-  public addCustomHeaderToOrigin = (headerName:string, headerValue:string) => {
-    const { origin } = this;
-    
   }
 }
 
