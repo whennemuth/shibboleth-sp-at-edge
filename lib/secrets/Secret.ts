@@ -150,6 +150,8 @@ export class SecretsManagerSecret {
       throw error;
     }
     if (response.SecretString) {
+      console.log(`Secret ${Name} retrieved successfully.`);
+      
       // Cache the result
       this.lookupResult = response.SecretString;
 
