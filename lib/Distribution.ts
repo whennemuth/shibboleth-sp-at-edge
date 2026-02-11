@@ -42,7 +42,8 @@ export class CloudfrontDistribution extends Construct {
   constructor(stack: Construct, stackName: string, props: {
     httpOriginBase?: HttpOriginBase,
     ignoreRoute53: boolean,
-    context: IContext
+    context: IContext,
+    hostedZone: IRoute53HostedZone
   }) {
     
     super(stack, stackName);

@@ -22,7 +22,11 @@ export type ShibbolethAtEdgeConstructProps = {
   scope: Construct,
   id: string,
   context: IContext,
-  httpOriginBase?: HttpOriginBase,
+  httpOriginBase?: HttpOriginBase
+};
+
+type ShibbolethAtEdgeConstructPropsInternal = ShibbolethAtEdgeConstructProps & {
+  hostedZone: IRoute53HostedZone
 };
 
 /**
@@ -51,12 +55,13 @@ export class ShibbolethAtEdgeConstruct extends Construct {
   public static async getInstance(props: ShibbolethAtEdgeConstructProps): Promise<ShibbolethAtEdgeConstruct> {
 
     // Perform all async validation and setup
-    const processedContext = await ShibbolethAtEdgeConstruct.performAsyncSetup(props.context);
+    const { context: processedContext, hostedZone } = await ShibbolethAtEdgeConstruct.performAsyncValidation(props.context);
     
     // Create and return the construct with the processed context
     return new ShibbolethAtEdgeConstruct({
       ...props,
-      context: processedContext} satisfies ShibbolethAtEdgeConstructProps);
+      context: processedContext,
+      hostedZone} satisfies ShibbolethAtEdgeConstructPropsInternal);
   }
 
   /**
@@ -69,7 +74,7 @@ export class ShibbolethAtEdgeConstruct extends Construct {
     const { scope, context } = props;
 
     // Perform all async validation and setup
-    const processedContext = await ShibbolethAtEdgeConstruct.performAsyncSetup(context);
+    const { context: processedContext, hostedZone } = await ShibbolethAtEdgeConstruct.performAsyncValidation(context);
     
     const { ACCOUNT: account, REGION: region, TAGS: { 
       Landscape, Function, Service, CostCenter='', Ticket='' 
@@ -88,7 +93,8 @@ export class ShibbolethAtEdgeConstruct extends Construct {
     new ShibbolethAtEdgeConstruct({
       ...props,
       scope: stack,
-      context: processedContext} satisfies ShibbolethAtEdgeConstructProps);
+      context: processedContext,
+      hostedZone} satisfies ShibbolethAtEdgeConstructPropsInternal);
     
     return stack;
   }
@@ -96,8 +102,8 @@ export class ShibbolethAtEdgeConstruct extends Construct {
   /**
    * Private constructor - use getInstance() or createStack() instead
    */
-  constructor(private props: ShibbolethAtEdgeConstructProps) {
-    const { scope, id, context } = props;
+  constructor(private props: ShibbolethAtEdgeConstructPropsInternal) {
+    const { scope, id, context, hostedZone } = props;
     super(scope, id);
     
     // Configure custom resource defaults on the parent stack
@@ -133,7 +139,8 @@ export class ShibbolethAtEdgeConstruct extends Construct {
     this._cloudfrontDistribution = new CloudfrontDistribution(scope, distributionId, {
       ignoreRoute53: ShibbolethAtEdgeConstruct.ignoreRoute53,
       httpOriginBase: this.props.httpOriginBase,
-      context
+      context,
+      hostedZone
     });
     
     // Store the context configuration using ContextLog (S3 storage)
