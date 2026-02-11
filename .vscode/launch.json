@@ -7,10 +7,7 @@
       "skipFiles": ["<node_internals>/**"],
       "runtimeArgs": ["-r", "${workspaceFolder}/node_modules/ts-node/register/transpile-only"],
       "args": ["${workspaceFolder}/bin/App.ts"],
-      "env": {
-        "AWS_PROFILE": "bu"
-      },
-      "envFile": "${workspaceFolder}/.env"
+      "envFile": "${workspaceFolder}/debug.env"
     },
     {
       "type": "node",
@@ -26,9 +23,7 @@
         "${workspaceFolder}/bin/LambdaVersionCleanup.ts",
         "dryrun"
       ] , 
-      "env": {
-        "AWS_PROFILE": "bu"
-      } 
+      "envFile": "${workspaceFolder}/debug.env"
     },
     {
       "type": "node",
@@ -47,9 +42,8 @@
       "internalConsoleOptions": "neverOpen",
       "env": {
         "unmocked": "false",
-        "AWS_PROFILE": "bu",
-        "AWS_REGION": "us-east-2"
-      }
+      }, 
+      "envFile": "${workspaceFolder}/debug.env"
     },
     {
       "type": "node",
@@ -73,7 +67,6 @@
       "runtimeArgs": ["-r", "${workspaceFolder}/node_modules/ts-node/register/transpile-only"],
       "args": [ "${file}" ], 
       "env": {
-        "AWS_PROFILE": "bu",
         "AWS_REGION": "us-east-2"
       }, 
       "envFile": "${workspaceFolder}/debug.env"

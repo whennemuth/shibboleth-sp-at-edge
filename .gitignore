@@ -12,6 +12,7 @@ build/*
 cdk.out
 cdk.context.json
 .env
+debug.env
 
 RESUME-NEXT.txt
 bin/origin-swap/sample-origin-*
