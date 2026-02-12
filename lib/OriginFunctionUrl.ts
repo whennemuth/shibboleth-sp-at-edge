@@ -6,6 +6,7 @@ import { NodejsFunction } from "aws-cdk-lib/aws-lambda-nodejs";
 import { Construct } from "constructs";
 import { IContext, OriginFunctionUrl, OriginType } from "../context/IContext";
 import { HttpOriginBase } from "./Origin";
+import { APP_AUTHORIZATION_HEADER_NAME } from "shibboleth-sp";
 
 export type OriginFunctionUrlConfig = {
   origin:OriginFunctionUrl,
@@ -36,7 +37,7 @@ const getOtherLambdaAppOrigin = (config:OriginFunctionUrlConfig):HttpOrigin => {
     protocolPolicy: OriginProtocolPolicy.HTTPS_ONLY,
     httpsPort: 443,
     customHeaders: {
-      APP_AUTHORIZATION: `${appAuthorization}`
+      [APP_AUTHORIZATION_HEADER_NAME]: `${appAuthorization}`
     }       
   } as HttpOriginProps);
   return funcUrlOrigin;
@@ -82,7 +83,7 @@ const getDummyLambdaAppOrigin = (config:OriginFunctionUrlConfig):HttpOrigin => {
     protocolPolicy: OriginProtocolPolicy.HTTPS_ONLY,
     httpsPort: 443,
     customHeaders: {
-      APP_AUTHORIZATION: `${appAuthorization}`
+      [APP_AUTHORIZATION_HEADER_NAME]: `${appAuthorization}`
     }       
   } as HttpOriginProps);
 

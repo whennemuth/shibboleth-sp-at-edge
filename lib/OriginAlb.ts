@@ -8,6 +8,7 @@ import { ApplicationLoadBalancer, ApplicationLoadBalancerAttributes } from "aws-
 import { Construct } from "constructs";
 import { OriginAlb, OriginType } from "../context/IContext";
 import { HttpOriginBase } from "./Origin";
+import { APP_AUTHORIZATION_HEADER_NAME } from "shibboleth-sp";
 
 export type AlbParms = {
   scope:Construct,
@@ -45,7 +46,7 @@ const getHttpOrigin = (origin:OriginAlb): HttpOrigin => {
     httpsPort,
     originPath: '/',
     customHeaders: {
-      APP_AUTHORIZATION: `${appAuthorization}`,
+      [APP_AUTHORIZATION_HEADER_NAME]: `${appAuthorization}`,
       // CLOUDFRONT_CHALLENGE_HEADER_NAME could be set here.
     }       
   } as HttpOriginProps);
@@ -82,8 +83,8 @@ const getLoadBalancerV2Origin = (origin:OriginAlb, albParms: AlbParms): LoadBala
     } as ApplicationLoadBalancerAttributes
   ) as ApplicationLoadBalancer;
 
-  if( ! customHeaders.find(h => h.key == 'APP_AUTHORIZATION')) {
-    customHeaders.push({ key: 'APP_AUTHORIZATION', value: `${appAuthorization}` });
+  if( ! customHeaders.find(h => h.key == APP_AUTHORIZATION_HEADER_NAME) ) {
+    customHeaders.push({ key: APP_AUTHORIZATION_HEADER_NAME, value: `${appAuthorization}` });
   }
 
   return new LoadBalancerV2Origin(alb, {

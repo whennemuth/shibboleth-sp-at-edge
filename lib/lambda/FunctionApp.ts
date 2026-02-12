@@ -1,4 +1,4 @@
-import { JwtTools } from 'shibboleth-sp';
+import { APP_AUTHORIZATION_HEADER_NAME, JwtTools } from 'shibboleth-sp';
 import * as contextJSON from '../../context/context.json';
 import { IContext } from '../../context/IContext';
 
@@ -27,7 +27,7 @@ const handler = async (event:any) => {
   const { headers, rawPath='/' } = event;
   let appAuth = APP_AUTHORIZATION == 'true';
   if( ! appAuth) {
-    appAuth = 'true' == headers?.APP_AUTHORIZATION;
+    appAuth = 'true' == headers?.[APP_AUTHORIZATION_HEADER_NAME.toLowerCase()];
   }
 
   const pathParts = (rawPath as string).split('/').map(p => p.toLocaleLowerCase());

@@ -8,7 +8,7 @@ import { LambdaEdgeOriginRequestEvent } from './OriginRequestEventType';
 import { CachedKeys, checkCache } from './SecretsCache';
 
 const context = contextJSON as IContext;
-const { APP_LOGIN_HEADER, APP_LOGOUT_HEADER, SHIBBOLETH } = context;
+const { APP_LOGIN_HEADER, APP_LOGOUT_HEADER, SHIBBOLETH, ORIGIN: { appAuthorization = true } = {} } = context;
 const { entityId, entryPoint, logoutUrl, idpCert } = SHIBBOLETH as Shibboleth;
 
 const cachedKeys:CachedKeys = { 
@@ -49,9 +49,7 @@ export const handler =  async (event:LambdaEdgeOriginRequestEvent) => {
 
   // Destructure most variables
   const { request, config } = event.Records[0].cf;
-  const { uri, body, headers, method, querystring, clientIp, origin: { 
-    custom: { customHeaders = {}} = {}} = {} 
-  } = request;
+  const { uri, body, headers, method, querystring, clientIp } = request;
 
   // The viewer request lambda will have set this header from what it saw in the host header.
   const viewerDomain = headers[VIEWER_DOMAIN_HEADER_NAME.toLowerCase()]?.[0]?.value;
@@ -70,9 +68,6 @@ export const handler =  async (event:LambdaEdgeOriginRequestEvent) => {
 
   // We want the viewer domain if available, else the origin domain (see warning above).
   const domain = viewerDomain ? viewerDomain : originDomain;
-
-  // Get the app authorization setting from the custom headers.
-  const appAuthorization = `${customHeaders['app_authorization']?.[0]?.value}`.toLowerCase() === 'true';
 
   console.log(`Using ${JSON.stringify({ domain, appAuthorization }, null, 2)}`);
 
