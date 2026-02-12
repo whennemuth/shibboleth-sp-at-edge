@@ -28,13 +28,15 @@ checkCache(cachedKeys).then(() => {
  * redirect to the IDP for authentication to the app (but will handle all other parts of the SP/IDP process).
  * 
  * NOTE: It would have been preferable to have designated this function for viewer requests so that it could 
- * intercept EVERY request instead of potentially being bypassed in favor of cached content. However, the content
- * of this function needs to be under the 1MB limit for viewer requests. This might be possible, but for now, the
- * Origin request lambdas can be up to 50MB, and so we are using that instead, with caching for the origin disabled 
- * altogether to ensure EVERY request goes through this function. For other use cased, like the Boston University
- * WordPress caching strategy, all cookies and query strings are used to form the cache key, which effectively disables
- * caching as well by fragmenting it sufficiently so that no request traffic related to authentication is 
- * served from cache.
+ * intercept EVERY request instead of potentially being bypassed in favor of cached content. However, viewer request
+ * functions have a request/response body size limit of 40 KB, whereas origin request functions support up to 1 MB.
+ * SAML assertions from IdPs are typically sent as POST requests with Base64-encoded XML in the body, which can
+ * easily exceed 40 KB (especially with multiple attributes, groups, or encryption). CloudFront would truncate
+ * bodies larger than 40 KB before they reach a viewer request Lambda, breaking SAML authentication. Therefore,
+ * we use origin request with caching disabled to ensure EVERY request goes through this function. For use cases
+ * like the Boston University WordPress caching strategy, all cookies and query strings are used to form the cache
+ * key, which effectively disables caching as well by fragmenting it sufficiently so that no request traffic 
+ * related to authentication is served from cache.
  * @param event 
  * @returns 
  */

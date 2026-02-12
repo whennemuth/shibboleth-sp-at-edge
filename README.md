@@ -11,7 +11,7 @@ The request is processed by the lambda function using the [shibboleth-sp](https:
 - **Origin request lambda function:**
   This is where the bulk of the work is done. The service provider functionality resides here. Each incoming request has its headers checked for a valid authentication token (jwt) before passing through to the origin. If the token is missing or expired, the saml authentication flow with the shibboleth IDP is started.
   
-    >NOTE: This functionality should belong in a viewer request edge lambda, where every request would be processed, despite what's in the cache. However, the 1 MB limit for viewer request lambda code is exceeded, leaving the only choice of origin request lambda with a 50 MB code limit. In order to get the lambda hit for EVERY request, caching is disabled. PENDING A WORKAROUND AS CACHE DISABLING IS JUST AN ESCAPE HATCH.
+    >NOTE: This functionality should belong in a viewer request edge lambda, where every request would be processed, despite what's in the cache. However, viewer request Lambda@Edge functions have a 40 KB request/response body size limit, whereas origin request functions support up to 1 MB. SAML assertions from IdPs are typically sent as POST requests with Base64-encoded XML in the body, which can easily exceed 40 KB (especially with multiple attributes, groups, or encryption). CloudFront would truncate bodies larger than 40 KB before they reach a viewer request Lambda, breaking SAML authentication. In order to get the lambda hit for EVERY request, caching is disabled. PENDING A WORKAROUND AS CACHE DISABLING IS JUST AN ESCAPE HATCH.
   
 - **Viewer response lambda function:**
   This function merely switches the content-type of the outgoing response from `application/json` to `text/html` 
