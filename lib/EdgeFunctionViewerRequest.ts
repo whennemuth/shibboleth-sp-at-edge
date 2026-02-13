@@ -4,8 +4,10 @@ import { Code, Runtime } from "aws-cdk-lib/aws-lambda";
 import { EdgeLambda, experimental, LambdaEdgeEventType } from "aws-cdk-lib/aws-cloudfront";
 import path = require("path");
 import { CloudfrontDistribution } from "./Distribution";
+import { EDGE_REQUEST_VIEWER_FUNCTION_BASENAME } from "./EdgeFunctionConstants";
+import { getEdgeFunctionLoggingPolicy, getEdgeFunctionSecretsManagerPolicy } from "./EdgeFunctionOriginRequest";
 
-export const EDGE_REQUEST_VIEWER_FUNCTION_BASENAME = 'SPFunctionViewerRequest';
+export { EDGE_REQUEST_VIEWER_FUNCTION_BASENAME };
 
 /**
  * Create the Lambda@Edge viewer request function using pre-built assets.
@@ -26,6 +28,8 @@ export const createEdgeFunctionForViewerRequest = (scope:Construct, context:ICon
     code: Code.fromAsset(path.resolve(__dirname, buildPath)),
     functionName: `${STACK_ID}-${Landscape}-${EDGE_REQUEST_VIEWER_FUNCTION_BASENAME}`
   });
+  edgeFunction.addToRolePolicy(getEdgeFunctionSecretsManagerPolicy());
+  edgeFunction.addToRolePolicy(getEdgeFunctionLoggingPolicy());
 
   callback({
     eventType: LambdaEdgeEventType.VIEWER_REQUEST,

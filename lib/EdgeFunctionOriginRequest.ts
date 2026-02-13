@@ -5,13 +5,14 @@ import { IContext } from "../context/IContext";
 import { Construct } from "constructs";
 import path = require("path");
 import { CloudfrontDistribution } from "./Distribution";
+import { EDGE_REQUEST_ORIGIN_FUNCTION_BASENAME } from "./EdgeFunctionConstants";
 
-export const EDGE_REQUEST_ORIGIN_FUNCTION_BASENAME = 'SPFunctionOriginRequest';
+export { EDGE_REQUEST_ORIGIN_FUNCTION_BASENAME };
 
 /**
  * Create policy used by lambda@edge origin request function to access secrets manager.
  */
-const getEdgeFunctionSecretsManagerPolicy = ():PolicyStatement => {
+export const getEdgeFunctionSecretsManagerPolicy = ():PolicyStatement => {
   return new PolicyStatement({
     actions: [ 'secretsmanager:GetSecretValue', 'secretsmanager:ListSecrets' ],
     effect: Effect.ALLOW,
@@ -22,7 +23,7 @@ const getEdgeFunctionSecretsManagerPolicy = ():PolicyStatement => {
 /**
  * Create policy used by lambda@edge origin request function to stream logs to cloudwatch
  */
-const getEdgeFunctionLoggingPolicy = ():PolicyStatement => {
+export const getEdgeFunctionLoggingPolicy = ():PolicyStatement => {
   return new PolicyStatement({
     actions: [ 'logs:CreateLogGroup', 'logs:CreateLogStream', 'logs:PutLogEvents' ],
     effect: Effect.ALLOW,

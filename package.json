@@ -63,5 +63,10 @@
   },
   "overrides": {
     "js-yaml": "^3.14.2"
+  },
+  "ts-node": {
+    "compilerOptions": {
+      "module": "commonjs"
+    }
   }
 }

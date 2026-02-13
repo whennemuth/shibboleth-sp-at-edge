@@ -1,6 +1,8 @@
-import { EDGE_REQUEST_ORIGIN_FUNCTION_BASENAME } from '../lib/EdgeFunctionOriginRequest';
-import { EDGE_REQUEST_VIEWER_FUNCTION_BASENAME } from '../lib/EdgeFunctionViewerRequest';
-import { EDGE_RESPONSE_VIEWER_FUNCTION_BASENAME } from '../lib/EdgeFunctionViewerResponse';
+import { 
+  EDGE_REQUEST_ORIGIN_FUNCTION_BASENAME,
+  EDGE_REQUEST_VIEWER_FUNCTION_BASENAME,
+  EDGE_RESPONSE_VIEWER_FUNCTION_BASENAME 
+} from '../lib/EdgeFunctionConstants';
 
 import { IContext } from '../context/IContext';
 import * as ctx from '../context/context.json';

@@ -1,0 +1,12 @@
+{
+  "extends": "./tsconfig.cjs.json",
+  "include": [
+    "bin/LambdaVersionCleanup.ts",
+    "bin/DistributionToCleanup.ts"
+  ],
+  "exclude": [
+    "node_modules",
+    "dist",
+    "bin/build/**"
+  ]
+}

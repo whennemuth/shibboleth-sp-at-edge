@@ -4,8 +4,9 @@ import { Code, Runtime } from "aws-cdk-lib/aws-lambda";
 import path = require("path");
 import { EdgeLambda, LambdaEdgeEventType, experimental } from "aws-cdk-lib/aws-cloudfront";
 import { CloudfrontDistribution } from "./Distribution";
+import { EDGE_RESPONSE_VIEWER_FUNCTION_BASENAME } from "./EdgeFunctionConstants";
 
-export const EDGE_RESPONSE_VIEWER_FUNCTION_BASENAME = 'SPFunctionViewerResponse';
+export { EDGE_RESPONSE_VIEWER_FUNCTION_BASENAME };
 
 /**
  * Create the Lambda@Edge viewer response function using pre-built assets.
