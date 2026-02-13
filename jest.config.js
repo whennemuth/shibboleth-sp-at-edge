@@ -7,6 +7,9 @@ module.exports = {
     '<rootDir>/dist/',
     '<rootDir>/node_modules/'
   ],
+  moduleNameMapper: {
+    '^shibboleth-sp$': '<rootDir>/__mocks__/shibboleth-sp.js'
+  },
   transform: {
     '^.+\\.tsx?$': 'ts-jest'
   },

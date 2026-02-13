@@ -1,9 +1,25 @@
 import { jest } from '@jest/globals';
+
+// Mock shibboleth-sp BEFORE any imports that use it
+jest.mock('shibboleth-sp');
+
 import { IConfig, IRequest, IResponse } from 'shibboleth-sp';
 import { handler } from './FunctionSpOriginRequest';
 import { CachedKeys } from './SecretsCache';
 import { CloudFrontRequest, LambdaEdgeOriginRequestEvent } from './OriginRequestEventType';
 import { instanceOf } from '../Util';
+
+/**
+ * Tests for the Origin Request Lambda@Edge function.
+ * 
+ * ARCHITECTURE NOTE:
+ * As of the cache optimization implementation, this Lambda works with a viewer request Lambda:
+ * - Viewer Request: Validates JWTs, detects SAML flows, controls cache bypass (runs on EVERY request)
+ * - Origin Request (TESTED HERE): Processes SAML bodies, handles auth flow (runs only when needed)
+ * 
+ * These tests focus on the SAML processing logic. The viewer request Lambda tests verify
+ * cache control and JWT validation logic separately.
+ */
 
 enum SP_RETVAL_TYPE { response='wants_an_IResponse_back', request='wants_a_request_back' }
 

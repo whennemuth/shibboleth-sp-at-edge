@@ -22,21 +22,41 @@ checkCache(cachedKeys).then(() => {
 });
 
 /**
- * This is the lambda@edge function for origin request traffic. It will perform all saml SP operations for ensuring
- * that the user bears JWT proof of saml authentication, else it drives the authentication flow with the IDP.
- * If the APP_AUTHORIZATION environment/context variable is set to true, it will relinquish the "decision" to make the
- * redirect to the IDP for authentication to the app (but will handle all other parts of the SP/IDP process).
+ * This is the lambda@edge function for origin request traffic. It handles the full SAML Service Provider
+ * operations including processing SAML assertions with potentially large POST bodies (up to 1 MB).
  * 
- * NOTE: It would have been preferable to have designated this function for viewer requests so that it could 
- * intercept EVERY request instead of potentially being bypassed in favor of cached content. However, viewer request
- * functions have a request/response body size limit of 40 KB, whereas origin request functions support up to 1 MB.
- * SAML assertions from IdPs are typically sent as POST requests with Base64-encoded XML in the body, which can
- * easily exceed 40 KB (especially with multiple attributes, groups, or encryption). CloudFront would truncate
- * bodies larger than 40 KB before they reach a viewer request Lambda, breaking SAML authentication. Therefore,
- * we use origin request with caching disabled to ensure EVERY request goes through this function. For use cases
- * like the Boston University WordPress caching strategy, all cookies and query strings are used to form the cache
- * key, which effectively disables caching as well by fragmenting it sufficiently so that no request traffic 
- * related to authentication is served from cache.
+ * ARCHITECTURE OVERVIEW:
+ * This Lambda works in tandem with the viewer request Lambda to provide both security and performance:
+ * 
+ * - Viewer Request Lambda: Runs on EVERY request (including cache hits)
+ *   * Validates JWT tokens
+ *   * Detects SAML flow requests
+ *   * Marks requests that need auth processing to bypass cache
+ *   * Allows authenticated requests to use cache
+ * 
+ * - Origin Request Lambda (THIS FUNCTION): Only runs when:
+ *   * Cache miss occurs
+ *   * Viewer request Lambda marked request as needing authentication (JWT invalid/missing)
+ *   * Request is part of SAML flow (callbacks, logout, etc.)
+ * 
+ * RESPONSIBILITIES:
+ * - Process SAML POST bodies (can be > 40 KB, which exceeds viewer request limit)
+ * - Perform full JWT validation and refresh
+ * - Handle SAML authentication flow with IdP
+ * - Generate authentication tokens
+ * - If APP_AUTHORIZATION is true, coordinate with application for authorization decisions
+ * 
+ * CACHING STRATEGY:
+ * Unlike the previous approach, caching is NOT fully disabled. Instead:
+ * - Authenticated requests with valid JWTs can be served from cache
+ * - Only authentication-related requests bypass cache (via viewer request Lambda control)
+ * - This provides better performance while maintaining security
+ * 
+ * BODY SIZE LIMIT:
+ * This Lambda supports request/response bodies up to 1 MB (vs 40 KB for viewer request).
+ * SAML assertions typically range from 20-100+ KB, making origin request the appropriate choice
+ * for SAML processing despite it potentially being bypassed by cache for already-authenticated users.
+ * 
  * @param event 
  * @returns 
  */

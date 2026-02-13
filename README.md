@@ -1,24 +1,50 @@
 # Shibboleth service-provider "@edge"
 
-This is a sample project for the implementation of a shibboleth service provider in a [lambda@edge](https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/lambda-at-the-edge.html) function.
-All http requests go through a [cloudfront distribution](https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/distribution-overview.html) which first passes them through the function to determine authentication status.
-The request is processed by the lambda function using the [shibboleth-sp](https://www.npmjs.com/package/shibboleth-sp) library to either verify authenticated status or drive the authentication process with the shibboleth IDP to get authenticated before passing through to the targeted [origin](https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/DownloadDistS3AndCustomOrigins.html).
+This project implements a shibboleth service provider using [lambda@edge](https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/lambda-at-the-edge.html) functions.
+All http requests go through a [cloudfront distribution](https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/distribution-overview.html) which uses TWO Lambda@Edge functions working in tandem to provide both security and performance:
+
+1. **Viewer Request Lambda**: Runs on EVERY request (including cache hits) to validate authentication
+2. **Origin Request Lambda**: Processes SAML authentication flow only when needed (cache miss or auth required)
+
+The request is processed using the [shibboleth-sp](https://www.npmjs.com/package/shibboleth-sp) library to either verify authenticated status or drive the authentication process with the shibboleth IDP before passing through to the targeted [origin](https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/DownloadDistS3AndCustomOrigins.html).
 
 ### Stack overview
 
 ![diagram1](./docs/diagram.png)
 
-- **Origin request lambda function:**
-  This is where the bulk of the work is done. The service provider functionality resides here. Each incoming request has its headers checked for a valid authentication token (jwt) before passing through to the origin. If the token is missing or expired, the saml authentication flow with the shibboleth IDP is started.
+- **Viewer request lambda function:**
+  This lightweight function runs on EVERY incoming request, even those served from cache. It performs fast JWT validation (signature and expiration check) without needing to process request bodies. Based on the authentication state, it either:
+  - Allows the request to proceed to cache (if JWT is valid and it's not a SAML flow request)
+  - Marks the request to bypass cache and reach the origin request Lambda (if JWT is invalid, missing, expired, or it's part of SAML flow)
   
-    >NOTE: This functionality should belong in a viewer request edge lambda, where every request would be processed, despite what's in the cache. However, viewer request Lambda@Edge functions have a 40 KB request/response body size limit, whereas origin request functions support up to 1 MB. SAML assertions from IdPs are typically sent as POST requests with Base64-encoded XML in the body, which can easily exceed 40 KB (especially with multiple attributes, groups, or encryption). CloudFront would truncate bodies larger than 40 KB before they reach a viewer request Lambda, breaking SAML authentication. In order to get the lambda hit for EVERY request, caching is disabled. PENDING A WORKAROUND AS CACHE DISABLING IS JUST AN ESCAPE HATCH.
+  This ensures every request is checked for authentication while still allowing CloudFront caching to improve performance for authenticated users.
+
+- **Origin request lambda function:**
+  This function handles the full SAML Service Provider operations including processing large SAML POST bodies (up to 1 MB). It only runs when:
+  - Cache miss occurs
+  - Viewer request Lambda marked the request as needing authentication
+  - Request is part of SAML authentication flow (callbacks, logout, etc.)
+  
+  Each incoming request has its headers checked for a valid authentication token (JWT). If the token is missing or expired, the SAML authentication flow with the shibboleth IDP is initiated.
+  
+    >NOTE: SAML assertions from IdPs are sent as POST requests with Base64-encoded XML that can easily exceed 40 KB (especially with multiple attributes, groups, or encryption). Viewer request Lambda@Edge functions have a 40 KB request/response body size limit, which would cause CloudFront to truncate SAML responses. Therefore, SAML processing must be done in the origin request Lambda which supports up to 1 MB bodies. The viewer request Lambda handles JWT validation and cache control, while origin request handles SAML POST processing.
   
 - **Viewer response lambda function:**
   This function merely switches the content-type of the outgoing response from `application/json` to `text/html` 
 
 - **Origin ("App") lambda function:**
-  This application that authentication grants access to. In this case a simple lambda function.
+  The application that authentication grants access to. In this case a simple lambda function.
   Outside of this simple demo stack, this might be something more conventional, like a container cluster fronted by a load balancer.
+
+### Caching Strategy:
+
+Rather than disabling caching entirely (an obvious but performance-limiting workaround), this implementation uses intelligent cache control:
+
+- **Authenticated requests with valid JWTs**: Can be served from cache (high performance)
+- **Unauthenticated requests**: Bypass cache and go through full auth check (security)
+- **SAML flow requests**: Always bypass cache regardless of JWT status (protocol compliance)
+
+This provides the best of both worlds: every request is checked for authentication (by viewer request Lambda), but authenticated users benefit from CloudFront's caching capabilities.
 
 ### Authentication flow:
 
