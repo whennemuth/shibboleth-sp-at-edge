@@ -19,7 +19,8 @@ export type IRoute53HostedZone = {
   createARecord: (parms: {
     scope: Construct,
     id: string,
-    distribution: Distribution,
+    distribution?: Distribution,
+    distributionDomainName?: string,
     hostedZone: string,
     recordName: string
   }) => void;
@@ -92,20 +93,40 @@ export class Route53HostedZone implements IRoute53HostedZone {
   public createARecord = (parms: {
     scope: Construct,
     id: string,
-    distribution: Distribution,
+    distribution?: Distribution,
+    distributionDomainName?: string,
     hostedZone: string,
     recordName: string
   }) => {
 
-    const { distribution, hostedZone, id, recordName, scope } = parms;
+    const { distribution, distributionDomainName, hostedZone, id, recordName, scope } = parms;
     
     // Create the A record
-    const aRecord = new ARecord(scope, id, {
-      target: RecordTarget.fromAlias(new CloudFrontTarget(distribution)),
+    let aRecord: ARecord;
+    if( distribution ) {
+      aRecord = new ARecord(scope, id, {
+        target: RecordTarget.fromAlias(new CloudFrontTarget(distribution)),
+        zone: HostedZone.fromLookup(scope, `${id}hostedzone`, { domainName: hostedZone }),
+        comment: `ALIAS record for ${recordName} pointing to CloudFront distribution: ${distribution.distributionId}`,
+        recordName
+      } as ARecordProps);
+    }
+    else if(distributionDomainName) {
+      aRecord = new ARecord(scope, id, {
       zone: HostedZone.fromLookup(scope, `${id}hostedzone`, { domainName: hostedZone }),
-      comment: `A Record for distribution: ${distribution.distributionId}`,
-      recordName
-    } as ARecordProps);
+      recordName,
+      target: RecordTarget.fromAlias({
+        bind: () => ({
+          dnsName: distributionDomainName,
+          hostedZoneId: 'Z2FDTNDATAQYW2' // Standard global CloudFront hosted zone ID
+        })
+      }),
+      comment: `ALIAS record for ${recordName} pointing to CloudFront distribution: ${distributionDomainName}`
+    });
+    }
+    else {
+      throw new Error('Either distribution or distributionDomainName must be provided to create A record');
+    } 
   
     // Create an SSM parameter to track ownership
     const stackName = getStackName(this._context);
