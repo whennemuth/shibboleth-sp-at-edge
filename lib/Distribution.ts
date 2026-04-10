@@ -1,6 +1,6 @@
 import { CfnOutput, Duration, RemovalPolicy } from 'aws-cdk-lib';
 import { Certificate, ICertificate } from 'aws-cdk-lib/aws-certificatemanager';
-import { AllowedMethods, BehaviorOptions, CacheCookieBehavior, CacheHeaderBehavior, CachePolicy, CachePolicyProps, CacheQueryStringBehavior, Distribution, DistributionProps, EdgeLambda, OriginRequestPolicy, PriceClass, ViewerProtocolPolicy } from 'aws-cdk-lib/aws-cloudfront';
+import { AllowedMethods, BehaviorOptions, CacheCookieBehavior, CacheHeaderBehavior, CachePolicy, CachePolicyProps, CacheQueryStringBehavior, Distribution, DistributionProps, EdgeLambda, FunctionAssociation, FunctionEventType, OriginRequestPolicy, PriceClass, ViewerProtocolPolicy } from 'aws-cdk-lib/aws-cloudfront';
 import { NodejsFunction } from 'aws-cdk-lib/aws-lambda-nodejs';
 import { Bucket, ObjectOwnership } from 'aws-cdk-lib/aws-s3';
 import { Construct } from 'constructs';
@@ -12,8 +12,11 @@ import { createEdgeFunctionForViewerResponse } from './EdgeFunctionViewerRespons
 import { HttpOriginBase } from './Origin';
 import { getAlbOrigin } from './OriginAlb';
 import { getFunctionUrlOrigin } from './OriginFunctionUrl';
+// Routing constructs — only instantiated when context.ROUTING?.enabled
+import { RoutingFunction } from './routing/RoutingFunction';
+import { RoutingKeyValueStore } from './routing/RoutingKeyValueStore';
 import type { IRoute53HostedZone } from './Route53';
-import { getStackName, ParameterTester } from './Util';
+import { getStackName, ParameterTester } from './util';
 import path = require('path');
 
 /**
@@ -38,6 +41,7 @@ export class CloudfrontDistribution extends Construct {
   private testOrigin:HttpOriginBase;
   private cloudFrontDistribution:Distribution;
   private buCachePolicy:CachePolicy|undefined;
+  private routingFunctionAssociation: FunctionAssociation | undefined;
 
   constructor(stack: Construct, stackName: string, private props: {
     httpOriginBase?: HttpOriginBase,
@@ -73,6 +77,19 @@ export class CloudfrontDistribution extends Construct {
       edgeLambdas.push(edgeLambda);
     });
     const { edgeFunctionForOriginRequest } = this;
+
+    // 2.5) Create routing infrastructure if enabled
+    if (context.ROUTING?.enabled) {
+      const routingKvs = new RoutingKeyValueStore(this, 'RoutingKvs', context);
+      const routingFn = new RoutingFunction(this, 'RoutingFn', {
+        kvs: routingKvs.store,
+        context,
+      });
+      this.routingFunctionAssociation = {
+        function: routingFn.fn,
+        eventType: FunctionEventType.VIEWER_REQUEST,
+      };
+    }
 
     // 3) Create the primary origin if indicated.
     if(httpOriginBase) {
@@ -227,7 +244,7 @@ export class CloudfrontDistribution extends Construct {
      * @param customDomain 
      * @returns 
      */
-    const getBehavior = (origin:HttpOriginBase, customDomain:boolean, forceNoCache:boolean = false):BehaviorOptions => {
+    const getBehavior = (origin:HttpOriginBase, customDomain:boolean, forceNoCache:boolean = false, includeRouting:boolean = false):BehaviorOptions => {
       const { STANDARD, BU_CACHE, NO_CACHE } = CloudFrontCachingStrategy;
       const { context: { CLOUDFRONT_CACHING_STRATEGY=NO_CACHE } } = this;
       const { ALLOW_ALL, REDIRECT_TO_HTTPS } = ViewerProtocolPolicy;
@@ -251,6 +268,11 @@ export class CloudfrontDistribution extends Construct {
             ALL_VIEWER /** alb */
         ) : ALL_VIEWER_EXCEPT_HOST_HEADER, // See NOTE 2        
       } as BehaviorOptions;
+
+      // Add routing function association if enabled and requested for this behavior
+      if (includeRouting && this.routingFunctionAssociation) {
+        behaviorOptions.functionAssociations = [this.routingFunctionAssociation];
+      }
 
       switch(cachePolicy) {
         case STANDARD:
@@ -292,12 +314,14 @@ export class CloudfrontDistribution extends Construct {
     /**
      * @returns A behavior for the test origin if no primary origin is configured in context.json, 
      * else a behavior based on the configured origin.
+     * 
+     * The default behavior includes the routing function (if enabled via context.ROUTING).
      */
     const getDefaultBehavior = ():BehaviorOptions => {
       if(origin) {
-        return getBehavior(origin, customDomain());
+        return getBehavior(origin, customDomain(), false, true);  // includeRouting = true
       }
-      return getBehavior(testOrigin, false);
+      return getBehavior(testOrigin, false, false, true);  // includeRouting = true
     }
 
     // Configure distribution properties

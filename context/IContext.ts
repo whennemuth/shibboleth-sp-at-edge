@@ -9,6 +9,7 @@ export interface IContext {
     CLOUDFRONT_CACHING_STRATEGY?:       CloudFrontCachingStrategy;
     SHIBBOLETH:                         Shibboleth;
     TAGS:                               Tags;
+    ROUTING?:                           RoutingConfig;
 }
 
 export enum CloudFrontCachingStrategy {
@@ -69,4 +70,11 @@ export interface Tags {
     Landscape: string;
     CostCenter?: string;
     Ticket?: string;
+}
+
+export interface RoutingConfig {
+    enabled: boolean;
+    kvsName?: string;                          // Override default KVS name
+    defaultOriginType: 'webrouter' | 'wordpress';  // What unmatched paths fall through to
+    enableLogging?: boolean;                   // Enable console.log for routing decisions (optional, default false)
 }

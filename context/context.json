@@ -38,5 +38,10 @@
     "Landscape": "devl1",
     "CostCenter": "AWS Word Press Migration to AWS",
     "Ticket": "WP_MIGRATION_TBD"
+  },
+  "ROUTING": {
+    "enabled": false,
+    "defaultOriginType": "webrouter",
+    "enableLogging": false
   }
 }
