@@ -28,7 +28,13 @@ export type Origin = {
     httpsPort:           number;
     subdomain?:          string; // Includes hostedZone AND subdomain
     appAuthorization:    boolean;
+    cloudfront?:         CloudFrontOriginConfig;
 };
+
+export interface CloudFrontOriginConfig {
+    challengeHeaderName:  string;
+    challengeHeaderValue: string;
+}
 
 export type DNS = {
     hostedZone:         string;
@@ -74,7 +80,7 @@ export interface Tags {
 
 export interface RoutingConfig {
     enabled: boolean;
-    kvsName?: string;                          // Override default KVS name
+    tableName?: string;                        // Override default DynamoDB table name (optional)
     defaultOriginType: 'webrouter' | 'wordpress';  // What unmatched paths fall through to
-    enableLogging?: boolean;                   // Enable console.log for routing decisions (optional, default false)
+    cacheTtlSeconds?: number;                  // Cache TTL in seconds (default: 300 = 5 minutes)
 }

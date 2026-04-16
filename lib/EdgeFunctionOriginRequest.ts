@@ -33,23 +33,39 @@ export const getEdgeFunctionLoggingPolicy = ():PolicyStatement => {
 
 /**
  * Create the Lambda@Edge origin request function using pre-built assets.
- *  
+ * When routing is enabled, uses routing-handler.ts as entry point.
+ * When routing is disabled, uses FunctionSpOriginRequest.ts directly.
+ * 
  * @param scope 
  * @param context 
  * @param callback
  * @returns 
  */
-export const createEdgeFunctionForOriginRequest = (scope:Construct, context:IContext, callback:(lambda:EdgeLambda) => void) => {
-  const { STACK_ID, TAGS: { Landscape} } = context;
+export const createEdgeFunctionForOriginRequest = (
+  scope: Construct, 
+  context: IContext, 
+  callback: (lambda: EdgeLambda, edgeFunction: experimental.EdgeFunction) => void
+) => {
+  const { STACK_ID, TAGS: { Landscape}, ROUTING } = context;
   const { EDGE_ORIGIN_REQUEST_ID } = CloudfrontDistribution;
+
+  // Choose handler based on routing config
+  const handlerFile = ROUTING?.enabled 
+    ? 'routing-handler'  // Routing wrapper (delegates to auth)
+    : EDGE_ORIGIN_REQUEST_ID;  // Direct auth handler
+  
+  console.log(`[CDK] Using origin-request handler: ${handlerFile}.handler`);
 
   const isInstalled = __dirname.includes('node_modules');
   const buildPath = isInstalled ? '../../../build' : '../build';
+  
+  // Note: Lambda@Edge doesn't support environment variables.
+  // Configuration is baked into the bundled code via context.json import in routing-handler.ts
   const edgeFunction = new experimental.EdgeFunction(scope, EDGE_ORIGIN_REQUEST_ID, {
     runtime: Runtime.NODEJS_22_X,
-    handler: `${EDGE_ORIGIN_REQUEST_ID}.handler`,
+    handler: `${handlerFile}.handler`,
     code: Code.fromAsset(path.resolve(__dirname, buildPath)),
-    functionName: `${STACK_ID}-${Landscape}-${EDGE_REQUEST_ORIGIN_FUNCTION_BASENAME}`
+    functionName: `${STACK_ID}-${Landscape}-${EDGE_REQUEST_ORIGIN_FUNCTION_BASENAME}`,
   });
   edgeFunction.addToRolePolicy(getEdgeFunctionSecretsManagerPolicy());
   edgeFunction.addToRolePolicy(getEdgeFunctionLoggingPolicy());
@@ -58,5 +74,5 @@ export const createEdgeFunctionForOriginRequest = (scope:Construct, context:ICon
     eventType: LambdaEdgeEventType.ORIGIN_REQUEST,
     functionVersion: edgeFunction.currentVersion,
     includeBody: true
-  });
+  }, edgeFunction);
 }

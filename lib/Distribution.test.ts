@@ -749,4 +749,152 @@ describe('CloudfrontDistribution', () => {
       });
     });
   });
+
+  describe('Routing Configuration', () => {
+    it('should not create routing resources when ROUTING is undefined', () => {
+      const context: IContext = {
+        ...createBaseMockContext(),
+        // No ROUTING field
+      };
+
+      stack.node.setContext('stack-parms', context);
+
+      expect(() => {
+        new CloudfrontDistribution(stack, 'test-distribution', {
+          ignoreRoute53: true,
+          context,
+          hostedZone: new Route53HostedZone(context)
+        });
+      }).not.toThrow();
+
+      // Verify no CloudFront Function or KVS resources were created
+      const template = app.synth().getStackByName(stack.stackName).template;
+      const resources = template.Resources || {};
+      
+      // Should not have CloudFront Function or KeyValueStore
+      const hasCfFunction = Object.values(resources).some(
+        (r: any) => r.Type === 'AWS::CloudFront::Function'
+      );
+      const hasKvs = Object.values(resources).some(
+        (r: any) => r.Type === 'AWS::CloudFront::KeyValueStore'
+      );
+
+      expect(hasCfFunction).toBe(false);
+      expect(hasKvs).toBe(false);
+    });
+
+    it('should not create routing resources when ROUTING.enabled is false', () => {
+      const context: IContext = {
+        ...createBaseMockContext(),
+        ROUTING: {
+          enabled: false,
+          defaultOriginType: 'webrouter'
+        }
+      };
+
+      stack.node.setContext('stack-parms', context);
+
+      expect(() => {
+        new CloudfrontDistribution(stack, 'test-distribution', {
+          ignoreRoute53: true,
+          context,
+          hostedZone: new Route53HostedZone(context)
+        });
+      }).not.toThrow();
+
+      const template = app.synth().getStackByName(stack.stackName).template;
+      const resources = template.Resources || {};
+      
+      const hasCfFunction = Object.values(resources).some(
+        (r: any) => r.Type === 'AWS::CloudFront::Function'
+      );
+      const hasKvs = Object.values(resources).some(
+        (r: any) => r.Type === 'AWS::CloudFront::KeyValueStore'
+      );
+
+      expect(hasCfFunction).toBe(false);
+      expect(hasKvs).toBe(false);
+    });
+
+    it('should create routing resources when ROUTING.enabled is true', () => {
+      const context: IContext = {
+        ...createBaseMockContext(),
+        ROUTING: {
+          enabled: true,
+          defaultOriginType: 'webrouter'
+        }
+      };
+
+      stack.node.setContext('stack-parms', context);
+
+      expect(() => {
+        new CloudfrontDistribution(stack, 'test-distribution', {
+          ignoreRoute53: true,
+          context,
+          hostedZone: new Route53HostedZone(context)
+        });
+      }).not.toThrow();
+
+      const template = app.synth().getStackByName(stack.stackName).template;
+      const resources = template.Resources || {};
+      
+      // Should have DynamoDB Table for routing
+      const hasDynamoDBTable = Object.values(resources).some(
+        (r: any) => r.Type === 'AWS::DynamoDB::Table'
+      );
+
+      expect(hasDynamoDBTable).toBe(true);
+    });
+
+    it('should use custom table name when provided', () => {
+      const context: IContext = {
+        ...createBaseMockContext(),
+        ROUTING: {
+          enabled: true,
+          tableName: 'custom-routing-table',
+          defaultOriginType: 'webrouter'
+        }
+      };
+
+      stack.node.setContext('stack-parms', context);
+
+      new CloudfrontDistribution(stack, 'test-distribution', {
+        ignoreRoute53: true,
+        context,
+        hostedZone: new Route53HostedZone(context)
+      });
+
+      const template = app.synth().getStackByName(stack.stackName).template;
+      const resources = template.Resources || {};
+      
+      const table = Object.values(resources).find(
+        (r: any) => r.Type === 'AWS::DynamoDB::Table'
+      ) as any;
+
+      expect(table).toBeDefined();
+      expect(table.Properties.TableName).toBe('custom-routing-table');
+    });
+
+    it('should use default cache TTL when not specified', () => {
+      const context: IContext = {
+        ...createBaseMockContext(),
+        ROUTING: {
+          enabled: true,
+          defaultOriginType: 'webrouter'
+        }
+      };
+
+      stack.node.setContext('stack-parms', context);
+
+      expect(() => {
+        new CloudfrontDistribution(stack, 'test-distribution', {
+          ignoreRoute53: true,
+          context,
+          hostedZone: new Route53HostedZone(context)
+        });
+      }).not.toThrow();
+
+      // Default TTL is 300 seconds (5 minutes) - tested via routing cache module
+    });
+  });
 });

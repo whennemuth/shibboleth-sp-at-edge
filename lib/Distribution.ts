@@ -1,6 +1,6 @@
 import { CfnOutput, Duration, RemovalPolicy } from 'aws-cdk-lib';
 import { Certificate, ICertificate } from 'aws-cdk-lib/aws-certificatemanager';
-import { AllowedMethods, BehaviorOptions, CacheCookieBehavior, CacheHeaderBehavior, CachePolicy, CachePolicyProps, CacheQueryStringBehavior, Distribution, DistributionProps, EdgeLambda, FunctionAssociation, FunctionEventType, OriginRequestPolicy, PriceClass, ViewerProtocolPolicy } from 'aws-cdk-lib/aws-cloudfront';
+import { AllowedMethods, BehaviorOptions, CacheCookieBehavior, CacheHeaderBehavior, CachePolicy, CachePolicyProps, CacheQueryStringBehavior, Distribution, DistributionProps, EdgeLambda, FunctionAssociation, FunctionEventType, OriginRequestPolicy, PriceClass, ViewerProtocolPolicy, experimental } from 'aws-cdk-lib/aws-cloudfront';
 import { NodejsFunction } from 'aws-cdk-lib/aws-lambda-nodejs';
 import { Bucket, ObjectOwnership } from 'aws-cdk-lib/aws-s3';
 import { Construct } from 'constructs';
@@ -12,9 +12,8 @@ import { createEdgeFunctionForViewerResponse } from './EdgeFunctionViewerRespons
 import { HttpOriginBase } from './Origin';
 import { getAlbOrigin } from './OriginAlb';
 import { getFunctionUrlOrigin } from './OriginFunctionUrl';
-// Routing constructs — only instantiated when context.ROUTING?.enabled
-import { RoutingFunction } from './routing/RoutingFunction';
-import { RoutingKeyValueStore } from './routing/RoutingKeyValueStore';
+// Routing construct — only instantiated when context.ROUTING?.enabled
+import { RoutingTable } from './routing/RoutingTable';
 import type { IRoute53HostedZone } from './Route53';
 import { getStackName, ParameterTester } from './util';
 import path = require('path');
@@ -35,13 +34,12 @@ export class CloudfrontDistribution extends Construct {
   
   private stack:Construct;
   private context:IContext;
-  private edgeFunctionForOriginRequest:NodejsFunction|undefined;
+  private edgeFunctionForOriginRequest:experimental.EdgeFunction|undefined;
   private edgeLambdas = [] as EdgeLambda[];
   private origin:HttpOriginBase;
   private testOrigin:HttpOriginBase;
   private cloudFrontDistribution:Distribution;
   private buCachePolicy:CachePolicy|undefined;
-  private routingFunctionAssociation: FunctionAssociation | undefined;
 
   constructor(stack: Construct, stackName: string, private props: {
     httpOriginBase?: HttpOriginBase,
@@ -69,9 +67,9 @@ export class CloudfrontDistribution extends Construct {
     createEdgeFunctionForViewerRequest(scope, context, (edgeLambda:any) => {
       edgeLambdas.push(edgeLambda);
     });
-    createEdgeFunctionForOriginRequest(scope, context, (edgeLambda:any) => {
+    createEdgeFunctionForOriginRequest(scope, context, (edgeLambda:any, edgeFunction:experimental.EdgeFunction) => {
       edgeLambdas.push(edgeLambda);
-      this.edgeFunctionForOriginRequest = edgeLambda;
+      this.edgeFunctionForOriginRequest = edgeFunction;
     });
     createEdgeFunctionForViewerResponse(scope, context, (edgeLambda:any) => {
       edgeLambdas.push(edgeLambda);
@@ -80,15 +78,13 @@ export class CloudfrontDistribution extends Construct {
 
     // 2.5) Create routing infrastructure if enabled
     if (context.ROUTING?.enabled) {
-      const routingKvs = new RoutingKeyValueStore(this, 'RoutingKvs', context);
-      const routingFn = new RoutingFunction(this, 'RoutingFn', {
-        kvs: routingKvs.store,
-        context,
-      });
-      this.routingFunctionAssociation = {
-        function: routingFn.fn,
-        eventType: FunctionEventType.VIEWER_REQUEST,
-      };
+      const routingTableConstruct = new RoutingTable(this, 'RoutingTable', context);
+      const routingTable = routingTableConstruct.table;
+      
+      // Grant the origin-request Lambda read access to the routing table
+      if (edgeFunctionForOriginRequest) {
+        routingTable.grantReadData(edgeFunctionForOriginRequest);
+      }
     }
 
     // 3) Create the primary origin if indicated.
@@ -244,7 +240,7 @@ export class CloudfrontDistribution extends Construct {
      * @param customDomain 
      * @returns 
      */
-    const getBehavior = (origin:HttpOriginBase, customDomain:boolean, forceNoCache:boolean = false, includeRouting:boolean = false):BehaviorOptions => {
+    const getBehavior = (origin:HttpOriginBase, customDomain:boolean, forceNoCache:boolean = false):BehaviorOptions => {
       const { STANDARD, BU_CACHE, NO_CACHE } = CloudFrontCachingStrategy;
       const { context: { CLOUDFRONT_CACHING_STRATEGY=NO_CACHE } } = this;
       const { ALLOW_ALL, REDIRECT_TO_HTTPS } = ViewerProtocolPolicy;
@@ -266,13 +262,8 @@ export class CloudfrontDistribution extends Construct {
           isFunctionUrlOrigin ? 
             ALL_VIEWER_EXCEPT_HOST_HEADER /** function url */ : 
             ALL_VIEWER /** alb */
-        ) : ALL_VIEWER_EXCEPT_HOST_HEADER, // See NOTE 2        
+        ) : ALL_VIEWER_EXCEPT_HOST_HEADER, // See NOTE 2
       } as BehaviorOptions;
-
-      // Add routing function association if enabled and requested for this behavior
-      if (includeRouting && this.routingFunctionAssociation) {
-        behaviorOptions.functionAssociations = [this.routingFunctionAssociation];
-      }
 
       switch(cachePolicy) {
         case STANDARD:
@@ -319,9 +310,9 @@ export class CloudfrontDistribution extends Construct {
      */
     const getDefaultBehavior = ():BehaviorOptions => {
       if(origin) {
-        return getBehavior(origin, customDomain(), false, true);  // includeRouting = true
+        return getBehavior(origin, customDomain(), false);
       }
-      return getBehavior(testOrigin, false, false, true);  // includeRouting = true
+      return getBehavior(testOrigin, false, false);
     }
 
     // Configure distribution properties
