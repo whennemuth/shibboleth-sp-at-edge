@@ -28,13 +28,7 @@ export type Origin = {
     httpsPort:           number;
     subdomain?:          string; // Includes hostedZone AND subdomain
     appAuthorization:    boolean;
-    cloudfront?:         CloudFrontOriginConfig;
 };
-
-export interface CloudFrontOriginConfig {
-    challengeHeaderName:  string;
-    challengeHeaderValue: string;
-}
 
 export type DNS = {
     hostedZone:         string;
