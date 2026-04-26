@@ -1,7 +1,6 @@
 import { CfnOutput, Duration, RemovalPolicy } from 'aws-cdk-lib';
 import { Certificate, ICertificate } from 'aws-cdk-lib/aws-certificatemanager';
 import { AllowedMethods, BehaviorOptions, CacheCookieBehavior, CacheHeaderBehavior, CachePolicy, CachePolicyProps, CacheQueryStringBehavior, Distribution, DistributionProps, EdgeLambda, FunctionAssociation, FunctionEventType, OriginRequestPolicy, PriceClass, ViewerProtocolPolicy, experimental } from 'aws-cdk-lib/aws-cloudfront';
-import { NodejsFunction } from 'aws-cdk-lib/aws-lambda-nodejs';
 import { Bucket, ObjectOwnership } from 'aws-cdk-lib/aws-s3';
 import { Construct } from 'constructs';
 import { AUTH_PATHS } from 'shibboleth-sp';
