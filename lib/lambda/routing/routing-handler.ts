@@ -18,7 +18,13 @@ const routingConfig: RoutingCacheConfig | null = context.ROUTING?.enabled
 
 /**
  * Apply a routing rule to the request.
- * Returns a CloudFront response for redirects, or modifies the request for origin routing.
+ * 
+ * For redirects: Returns CloudFront response immediately (skips auth, no origin contact).
+ * For origin routing: Modifies request.origin and returns null to continue to auth handler.
+ * 
+ * CRITICAL: customHeaders must be empty. The auth handler adds cloudfront-challenge 
+ * and other headers to request.headers. Headers cannot exist in both places simultaneously
+ * or CloudFront returns 502 "invalid origin configuration" error.
  */
 function applyRoutingRule(
   request: any,
@@ -28,9 +34,9 @@ function applyRoutingRule(
     case 'cluster':
     case 'static':
     case 'php':
-      // Modify origin to route to specified target
-      // NOTE: Do NOT set headers in customHeaders! The auth handler adds them to request.headers.
-      // Setting headers in both places causes CloudFront validation errors (duplicate header violation).
+      // Replace request.origin to route to a different ALB/origin.
+      // Host header is NOT modified - WordPress multisite uses it for site selection.
+      // CloudFront uses domainName for TLS connection (SNI); Host header is application-level.
       request.origin = {
         custom: {
           domainName: rule.targetOrigin,
