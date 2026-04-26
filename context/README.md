@@ -44,12 +44,12 @@ This stack can be configured against two modes:
   - "no-cache": *default*, Cloudfront will not cache any content from the origin. Every request will be passed through to the origin.
   - "standard": Cloudfront will apply a typical caching strategy.
   - "bu-cache": Cloudfront will apply a caching strategy customized for BU websites.
-- ROUTING: *(Optional)* Enables CloudFront Function-based URL routing with KeyValueStore for multi-cluster routing, redirects, and static content serving. When absent or `enabled: false`, the distribution deploys without routing (standard Shibboleth auth-only mode).
+- ROUTING: *(Optional)* Enables Lambda@Edge-based URL routing with DynamoDB for multi-cluster routing, redirects, and static content serving. When absent or `enabled: false`, the distribution deploys without routing (standard Shibboleth auth-only mode).
   - enabled: *boolean* - Set to `true` to enable routing functionality. Default: `false`
-  - kvsName: *(Optional)* - Override the default KeyValueStore name. Default: `bu-routing-kvs-{Landscape}`
+  - tableName: *(Optional)* - Override the default DynamoDB table name. Default: `{STACK_ID}-routing-table-{Landscape}`
+  - cacheTtlSeconds: *(Optional)* - Cache TTL in seconds for routing rules. Default: `300` (5 minutes)
   - defaultOriginType: *'webrouter' | 'wordpress'* - Specifies where unmatched paths fall through to. For progressive webrouter absorption, use 'webrouter'. For standalone WordPress distributions, use 'wordpress'.
-  - enableLogging: *(Optional)* - Set to `true` to enable CloudWatch logging of routing decisions (KVS hits, origin selection). **Warning**: Generates significant CloudWatch costs at high traffic volumes. Recommended: `false` for production, `true` for dev/test. Default: `false`
-  - **Note**: The KVS starts empty and must be populated via AWS SDK (`UpdateKeys` API) or AWS CLI. Routing rules use type-prefixed values (e.g., `C:alb-domain` for cluster routing, `R:301:url` for redirects). See AGENT_STRATEGY.md for the complete KVS schema.
+  - **Note**: The DynamoDB table starts empty and must be populated via AWS SDK or scripts. Routing rules include path, routingType, and targetOrigin fields. See routing documentation for the complete schema.
 - SHIBBOLETH:
   - entityId: The ID of your application service provider
   - idpCert: The public key as published by shibboleth at the IDP entity ID endpoint.
