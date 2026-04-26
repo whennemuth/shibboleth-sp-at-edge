@@ -41,7 +41,6 @@
   },
   "ROUTING": {
     "enabled": false,
-    "defaultOriginType": "webrouter",
-    "enableLogging": false
+    "defaultOriginType": "webrouter"
   }
 }
