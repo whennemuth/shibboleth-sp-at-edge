@@ -50,8 +50,6 @@ function applyRoutingRule(
         },
       };
       console.log(`[Routing] Modified origin to ${rule.targetOrigin} (${rule.routingType})`);
-      console.log(`[Routing] Origin AFTER routing modification: ${JSON.stringify(request.origin, null, 2)}`);
-      console.log(`[Routing] request.headers AFTER routing (before auth): ${JSON.stringify(Object.keys(request.headers))}`);
       return null; // Continue to auth handler
       
     case 'redirect':
@@ -102,10 +100,6 @@ export const handler = async (event: LambdaEdgeOriginRequestEvent) => {
 
   const { request } = event.Records[0].cf;
   const { uri } = request;
-
-  // Log original origin state before routing
-  console.log(`[Routing] Original origin before routing: ${JSON.stringify(request.origin, null, 2)}`);
-  console.log(`[Routing] Original request.headers keys: ${JSON.stringify(Object.keys(request.headers))}`);
 
   // Check for routing rule
   const rule = await getRoutingRule(uri, routingConfig);
