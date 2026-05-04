@@ -12,6 +12,8 @@ When `ROUTING.enabled` is true in context.json, the CDK synthesis-time decision 
 
 ### Request Flow
 
+When routing is enabled, the request flow looks like this:
+
 ```
 User → CloudFront
          ↓
@@ -28,7 +30,7 @@ User → CloudFront
 Queries DynamoDB for routing rules based on request path, modifies `request.origin` if a rule matches, then delegates to the auth handler. Preserves all auth handler functionality (SAML, JWT, security headers).
 
 **DynamoDB Routing Table**
-This is a persistent data store for the routing rules, and is cached in-memory within the Lambda for performance. It uses the the same approach as the `bu-protected-s3-object-lambda` infrastructure.
+This is a persistent data store for the routing rules, and is cached in-memory within the Lambda for performance. It uses a similar approach as the `bu-protected-s3-object-lambda` infrastructure.
 
 ## Design Principles
 
