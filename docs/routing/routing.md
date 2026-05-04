@@ -58,7 +58,6 @@ The routing handler modifies `request.origin.custom.domainName` (the ALB DNS nam
 {
   "ROUTING": {
     "enabled": true,
-    "defaultOriginType": "wordpress",
     "tableName": "custom-routing-table",
     "cacheTtlSeconds": 300
   }
@@ -70,7 +69,6 @@ The routing handler modifies `request.origin.custom.domainName` (the ALB DNS nam
 - `enabled` — Boolean. Absence or false deploys the distribution without routing (zero added resources).
 - `tableName` — (Optional) Override default DynamoDB table name. Default: `{STACK_ID}-routing-table-{Landscape}`
 - `cacheTtlSeconds` — (Optional) Cache TTL in seconds. Default: 300 (5 minutes)
-- `defaultOriginType` — `"wordpress"` or `"webrouter"`. Fallback origin when no rule matches.
 
 When `ROUTING.enabled` is false or absent, the deployed function is `edge-origin-request.js` (auth only, estimated at 3.7 MB). When enabled, the deployed function is `routing-handler.js` (routing + auth, estimated at 5.0 MB). The size difference is the bundled DynamoDB SDK (the Lambda runtime does not include the DynamoDB client).
 
