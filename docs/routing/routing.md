@@ -119,31 +119,29 @@ Example rules:
 
 A recurring question when reviewing this implementation: *if the Lambda loads the whole table on every cache event, why use DynamoDB at all? Why not a JSON file in S3, or a parameter in SSM?*
 
-The answer is more substantive than "we used it in a precedent project."
+### The ability to support longest-prefix-match favors "load everything"
 
-### The lookup shape forces "load everything"
-
-The matching algorithm is longest-prefix-match over URL paths. A request for `/cas/biology/faculty/smith` walks the path hierarchy from longest to shortest (`/cas/biology/faculty` → `/cas/biology` → `/cas`) and returns the first matching rule. There is no single key the Lambda can compute up front to retrieve one rule. The alternative—issuing five to ten single-key `Get` requests per incoming request to walk the prefix chain, most of which would miss—trades one warm-container Scan for sustained per-request latency. Loading the full table once per container and matching in memory is the right call **regardless of the storage medium**.
+It can be beneficial to use a matching algorithm that is longest-prefix-match over URL paths. A request for `/cas/biology/faculty/smith` walks the path hierarchy from longest to shortest (`/cas/biology/faculty` → `/cas/biology` → `/cas`) and returns the first matching rule. There is no single key the Lambda can compute up front to retrieve one rule. The alternative—issuing five to ten single-key `Get` requests per incoming request to walk the prefix chain, most of which would miss—trades one warm-container Scan for sustained per-request latency. Loading the full table once per container and matching in memory is a good match for this scenario **regardless of the storage medium**.
 
 ### Once "load everything" is decided, storage choice is operational
 
-DynamoDB wins on two specific properties:
+DynamoDB has beneficial properties for this use case:
 
 1. **Atomic per-rule writes.** A `PutItem` call is safe under concurrent edits. An S3-backed JSON file requires read-modify-write with locking or last-writer-wins semantics. Both are error-prone when multiple team members edit rules simultaneously.
 
 2. **Console editor.** The AWS DynamoDB console provides a usable per-item editor out of the box. This matters most during Phase 1, when cluster assignments are mutated occasionally by team members for whom "edit the JSON blob in S3" is friction. An S3-backed JSON file is cheaper on paper but worse operationally.
 
-### The precedent is partial—and we should be honest about which half
+3. **Performance.** DynamoDB is much faster than S3 in general, and is one of the fastest options for Lambda in CloudFront. If we fall through from cache more often than expected for some reason, DynamoDB's low latency is a safety net.
 
-The `bu-protected-s3-object-lambda` project is cited as the precedent. The **module-level container caching pattern with TTL** is genuinely the same: compare `cachedProtectedSites` in `app.js` to `RoutingCache.ts`'s exported state. The **DynamoDB access pattern is different**: the precedent does a single `GetItem` against `PK='PROTECTED_SITES'` and `JSON.parse`s a blob, plus per-group `GetItem`s by composite key. It does not Scan.
+### Cached DynamoDB is a previously used pattern, but we are using it in a different way
 
-The routing table Scans because longest-prefix-match needs the whole table; the precedent doesn't Scan because its lookups are exact-key. Both projects use DynamoDB for fundamentally the right reasons, but the reasons are different. The precedent is the caching pattern, not the access pattern.
+The `bu-protected-s3-object-lambda` project is a partial precedent. The **module-level container caching pattern with TTL** is the same: compare `cachedProtectedSites` in `app.js` to `RoutingCache.ts`'s exported state. The **DynamoDB access pattern is different**: the S3 object lambda does a single `GetItem` against `PK='PROTECTED_SITES'` and `JSON.parse`s a blob, plus per-group `GetItem`s by composite key. It does not Scan.
+
+The routing table Scans in order to support longest-prefix-match, which needs the whole table.  The S3 object lambda doesn't Scan because its lookups are exact-key.
 
 ### Why not store the whole table as one JSON-encoded item?
 
-A single item at `PK='ROUTING_TABLE'` containing the full rule set as a JSON blob would be mechanically closer to the precedent's access pattern—one `GetItem`, one `JSON.parse`, populate the in-memory Map. The reason not to do this: **the AWS console editor operates at the item level**. One giant JSON blob defeats the console editor, and the console editor is a primary motivation for choosing DynamoDB in the first place. The row-per-rule design is the right one. The Scan is the cost of admission.
-
-## Routing Actions
+A single item at `PK='ROUTING_TABLE'` containing the full rule set as a JSON blob would be mechanically closer to the S3 object lambda's access pattern; one `GetItem`, one `JSON.parse`, then populate the in-memory Map. The reason not to do this: **the AWS console editor operates at the item level**. One giant JSON blob defeats the console editor, and the console editor is a primary motivation for choosing DynamoDB in the first place. The row-per-rule design is the right one. The Scan is the cost of admission.
 
 ## Routing Actions
 
