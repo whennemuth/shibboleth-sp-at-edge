@@ -48,7 +48,6 @@ This stack can be configured against two modes:
   - enabled: *boolean* - Set to `true` to enable routing functionality. Default: `false`
   - tableName: *(Optional)* - Override the default DynamoDB table name. Default: `{STACK_ID}-routing-table-{Landscape}`
   - cacheTtlSeconds: *(Optional)* - Cache TTL in seconds for routing rules. Default: `300` (5 minutes)
-  - defaultOriginType: *'webrouter' | 'wordpress'* - Specifies where unmatched paths fall through to. For progressive webrouter absorption, use 'webrouter'. For standalone WordPress distributions, use 'wordpress'.
   - **Note**: The DynamoDB table starts empty and must be populated via AWS SDK or scripts. Routing rules include path, routingType, and targetOrigin fields. See routing documentation for the complete schema.
 - SHIBBOLETH:
   - entityId: The ID of your application service provider
