@@ -301,4 +301,3 @@ Requests go to the default origin even when a DynamoDB rule exists.
 
 - [lib/lambda/routing/routing-handler.ts](../../lib/lambda/routing/routing-handler.ts) — Implementation
 - [lib/Distribution.ts](../../lib/Distribution.ts) — CloudFront construct with SAML path handling
-- [.github/copilot-instructions.md](../../.github/copilot-instructions.md) — Architectural baseline
