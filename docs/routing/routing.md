@@ -86,7 +86,6 @@ cdk deploy       # Deploys new Lambda version
 The routing rules consumed by the handler are stored in a per-stack DynamoDB table provisioned by the CDK construct when `ROUTING.enabled` is true.
 
 - **Table name:** `{STACK_ID}-routing-table-{Landscape}`
-- **Region:** us-east-1 (same as Lambda@Edge origin-request)
 - **Schema:** Partition key `path` (string), attributes vary by action type
 
 **Path matching:** Paths are case-insensitive. Both keys and lookups are normalized to lowercase. WordPress routes are de-facto case-insensitive at BU.
