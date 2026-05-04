@@ -87,29 +87,93 @@ The routing rules consumed by the handler are stored in a per-stack DynamoDB tab
 
 - **Table name:** `{STACK_ID}-routing-table-{Landscape}`
 - **Region:** us-east-1 (same as Lambda@Edge origin-request)
+- **Schema:** Partition key `path` (string), attributes vary by action type
 
-Example rule:
+**Path matching:** Paths are case-insensitive. Both keys and lookups are normalized to lowercase. WordPress routes are de-facto case-insensitive at BU.
+
+Example rules:
 
 ```json
 {
   "path": "/questrom",
-  "routingType": "php",
-  "targetOrigin": "example-alb-example-11111111111.us-east-2.elb.amazonaws.com"
+  "action": "origin",
+  "target": "questrom-alb-123.us-east-2.elb.amazonaws.com",
+  "matchType": "prefix",
+  "enabled": true
 }
 ```
 
-## Routing Types
+```json
+{
+  "path": "/studentlink",
+  "action": "redirect",
+  "matchType": "exact",
+  "redirectStatus": 301,
+  "target": "https://www.bu.edu/link",
+  "preserveQuery": false,
+  "enabled": true
+}
+```
 
-The routing types are the least well-defined aspect of the current implementation. The `php` type is implemented and tested, but probably misnamed. Other types are placeholders for future expansion. This aspect of the design is still fluid and may change. The current types are:
+## Why DynamoDB
 
-### php
+A recurring question when reviewing this implementation: *if the Lambda loads the whole table on every cache event, why use DynamoDB at all? Why not a JSON file in S3, or a parameter in SSM?*
 
-Routes to an ALB serving WordPress/PHP:
+The answer is more substantive than "we used it in a precedent project."
+
+### The lookup shape forces "load everything"
+
+The matching algorithm is longest-prefix-match over URL paths. A request for `/cas/biology/faculty/smith` walks the path hierarchy from longest to shortest (`/cas/biology/faculty` → `/cas/biology` → `/cas`) and returns the first matching rule. There is no single key the Lambda can compute up front to retrieve one rule. The alternative—issuing five to ten single-key `Get` requests per incoming request to walk the prefix chain, most of which would miss—trades one warm-container Scan for sustained per-request latency. Loading the full table once per container and matching in memory is the right call **regardless of the storage medium**.
+
+### Once "load everything" is decided, storage choice is operational
+
+DynamoDB wins on two specific properties:
+
+1. **Atomic per-rule writes.** A `PutItem` call is safe under concurrent edits. An S3-backed JSON file requires read-modify-write with locking or last-writer-wins semantics. Both are error-prone when multiple team members edit rules simultaneously.
+
+2. **Console editor.** The AWS DynamoDB console provides a usable per-item editor out of the box. This matters most during Phase 1, when cluster assignments are mutated occasionally by team members for whom "edit the JSON blob in S3" is friction. An S3-backed JSON file is cheaper on paper but worse operationally.
+
+### The precedent is partial—and we should be honest about which half
+
+The `bu-protected-s3-object-lambda` project is cited as the precedent. The **module-level container caching pattern with TTL** is genuinely the same: compare `cachedProtectedSites` in `app.js` to `RoutingCache.ts`'s exported state. The **DynamoDB access pattern is different**: the precedent does a single `GetItem` against `PK='PROTECTED_SITES'` and `JSON.parse`s a blob, plus per-group `GetItem`s by composite key. It does not Scan.
+
+The routing table Scans because longest-prefix-match needs the whole table; the precedent doesn't Scan because its lookups are exact-key. Both projects use DynamoDB for fundamentally the right reasons, but the reasons are different. The precedent is the caching pattern, not the access pattern.
+
+### Why not store the whole table as one JSON-encoded item?
+
+A single item at `PK='ROUTING_TABLE'` containing the full rule set as a JSON blob would be mechanically closer to the precedent's access pattern—one `GetItem`, one `JSON.parse`, populate the in-memory Map. The reason not to do this: **the AWS console editor operates at the item level**. One giant JSON blob defeats the console editor, and the console editor is a primary motivation for choosing DynamoDB in the first place. The row-per-rule design is the right one. The Scan is the cost of admission.
+
+## Routing Actions
+
+## Routing Actions
+
+The schema uses two action types: `origin` and `redirect`. Each describes what the rule does at runtime.
+
+### origin
+
+Modifies `request.origin` to direct traffic to a different ALB or S3 origin. The auth handler runs after origin modification.
+
+**Fields:**
+- `action: 'origin'` — Required discriminator
+- `path: string` — Required. URL path to match (case-insensitive).
+- `target: string` — Required. ALB DNS name or S3 domain **WITHOUT scheme and WITHOUT path**.  
+  Valid: `'wp-cluster-alb-123.us-east-2.elb.amazonaws.com'`  
+  Invalid: `'https://wp-cluster-alb-123.us-east-2.elb.amazonaws.com'` (includes scheme)  
+  Invalid: `'wp-cluster-alb-123.us-east-2.elb.amazonaws.com/path'` (includes path)  
+  Confusing origin and redirect target formats causes 502 (unreachable origin) or redirect loops.
+- `matchType?: 'exact' | 'prefix'` — Optional, defaults to `'prefix'`.  
+  `'exact'`: Rule matches only the literal path. Request for `/studentlink/foo` does NOT match rule `/studentlink`.  
+  `'prefix'`: Rule matches the path and all sub-paths (current behavior).
+- `enabled?: boolean` — Optional, defaults to `true`. When `false`, the rule is filtered out by the cache layer at load time.
+- `metadata?: object` — Optional audit fields (`createdAt`, `updatedAt`, `createdBy`). Populated by write tools, not enforced.
+- `description?: string` — Optional human-readable description.
+
+**Handler behavior:**
 
 ```javascript
 request.origin = {
   custom: {
-    domainName: rule.targetOrigin,  // ALB DNS name
+    domainName: rule.target,  // ALB DNS name or S3 domain
     port: 443,
     protocol: 'https',
     customHeaders: {},  // Empty - auth handler adds headers to request.headers
@@ -121,23 +185,72 @@ request.origin = {
 };
 ```
 
-### static
-
-Routes to an S3 bucket or static origin. Uses the same `custom` origin structure as the `php` type, with a different `domainName`.
-
 ### redirect
 
-Returns an immediate redirect without reaching origin:
+Returns a redirect response immediately without contacting origin or running the auth handler.
+
+**Fields:**
+- `action: 'redirect'` — Required discriminator
+- `path: string` — Required. URL path to match (case-insensitive).
+- `target: string` — Required. Fully-qualified URL **WITH scheme**.  
+  Valid: `'https://www.bu.edu/admissions'`  
+  Invalid: `'www.bu.edu/admissions'` (missing scheme)
+- `redirectStatus: 301 | 302 | 303 | 307 | 308` — Required. HTTP redirect status code.  
+  `301`: Moved Permanently  
+  `302`: Found (temporary)  
+  `303`: See Other  
+  `307`: Temporary Redirect (preserves method)  
+  `308`: Permanent Redirect (preserves method)
+- `preserveQuery?: boolean` — Optional, defaults to `false`. When `true`, appends `request.querystring` to the redirect target.  
+  Example: Request `/old?foo=1`, target `https://new.example.com`, produces `Location: https://new.example.com?foo=1`.
+- `matchType?: 'exact' | 'prefix'` — Optional, defaults to `'prefix'`. Same semantics as origin rules.
+- `enabled?: boolean` — Optional, defaults to `true`.
+- `metadata?: object` — Optional audit fields.
+- `description?: string` — Optional description.
+
+**Handler behavior:**
 
 ```javascript
+let redirectTarget = rule.target;
+if (rule.preserveQuery && request.querystring) {
+  const separator = rule.target.includes('?') ? '&' : '?';
+  redirectTarget = `${rule.target}${separator}${request.querystring}`;
+}
+
 return {
-  status: rule.redirectStatus,  // 301, 302, etc.
-  statusDescription: 'Found',
+  status: rule.redirectStatus,
+  statusDescription: 'Moved Permanently',  // or 'Found', etc.
   headers: {
-    location: [{ key: 'Location', value: rule.redirectTarget }]
+    location: [{ key: 'Location', value: redirectTarget }]
   }
 };
 ```
+
+## Rule Matching Behavior
+
+### Longest-prefix-match algorithm
+
+For prefix-match rules (`matchType: 'prefix'` or omitted), the handler walks the path hierarchy from longest to shortest:
+
+- Request `/cas/biology/faculty/smith`
+- Tries: `/cas/biology/faculty/smith` (exact), `/cas/biology/faculty`, `/cas/biology`, `/cas`, `/`
+- Returns first matching prefix rule
+
+### Exact-match rules
+
+Rules with `matchType: 'exact'` match only the literal path. Sub-paths fall through to the next matching rule or the default origin.
+
+- Rule: `{path: '/studentlink', matchType: 'exact'}`
+- Request `/studentlink` → matches
+- Request `/studentlink/foo` → does NOT match, falls through
+
+### Disabled rules
+
+Rules with `enabled: false` are filtered out by the cache layer at load time. The handler does not see them. Re-enabling a rule (flipping `enabled: false` → `true` in DynamoDB) takes effect on the next cache refresh (up to `cacheTtlSeconds`, typically 5 minutes).
+
+### Case-insensitivity
+
+All paths are normalized to lowercase during lookup. WordPress routes are de-facto case-insensitive at BU. This is a semantic choice, not an implementation detail.
 
 ## Performance and Scaling
 
@@ -180,10 +293,11 @@ Requests go to the default origin even when a DynamoDB rule exists.
 
 ## Known Limitations
 
-1. Paths must be exact or prefix-based. RegEx is not supported.
-2. DynamoDB single-table design. Partitioning may be necessary above ~3,000 rules if Scan latency becomes problematic.
-3. The `cluster` routing type is not implemented (single-target only).
-4. The first request after a Lambda cold start queries DynamoDB (no cache yet).
+1. **Regex not supported.** Path matching is exact or prefix-based only. Complex patterns require multiple rules or upstream/downstream transformation.
+2. **Single-table Scan design.** Partitioning may be necessary above ~3,000 rules if Scan latency becomes problematic (the 1 MB Scan response limit is the ceiling).
+3. **Cold-start DynamoDB query.** The first request after a Lambda cold start queries DynamoDB (no cache yet). Warm containers use the in-memory cache.
+4. **Re-enable latency.** Disabled rules take up to `cacheTtlSeconds` (default 5 minutes) to take effect after re-enabling.
+5. **Manual rule management.** No built-in validation or write tooling yet. Rules are edited via AWS console or custom scripts.
 
 ## Related Documentation
 

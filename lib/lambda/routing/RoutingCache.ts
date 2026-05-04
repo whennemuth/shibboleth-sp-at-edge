@@ -29,6 +29,9 @@ let ddbDocClient: DynamoDBDocumentClient;
  * Load the full routing table from DynamoDB using Scan.
  * For BU's 1,829 rules (~366 KB), a single scan response is typical.
  * Implements pagination for tables that exceed 1 MB response limit.
+ * 
+ * Filters out disabled rules (enabled === false) at load time.
+ * Re-enabling a rule (false → true) takes effect on next cache refresh (up to cacheTtlSeconds).
  */
 async function loadRoutingTable(tableName: string, region: string): Promise<Map<string, RoutingRule>> {
   // Initialize DynamoDB client lazily with the correct region
@@ -40,6 +43,8 @@ async function loadRoutingTable(tableName: string, region: string): Promise<Map<
 
   const table = new Map<string, RoutingRule>();
   let lastEvaluatedKey: Record<string, any> | undefined;
+  let totalScanned = 0;
+  let disabledCount = 0;
 
   do {
     const scanResult = await ddbDocClient.send(new ScanCommand({
@@ -48,27 +53,43 @@ async function loadRoutingTable(tableName: string, region: string): Promise<Map<
     }));
 
     for (const item of scanResult.Items || []) {
+      totalScanned++;
+      
       // Type guard: ensure required fields exist
-      if (item.path && item.routingType) {
-        table.set(item.path.toLowerCase(), item as RoutingRule);
-      } else {
-        console.warn(`[Routing] Skipping malformed item: ${JSON.stringify(item)}`);
+      if (!item.path || !item.action) {
+        console.warn(`[Routing] Skipping malformed item (missing path or action): ${JSON.stringify(item)}`);
+        continue;
       }
+
+      // Filter out disabled rules
+      if (item.enabled === false) {
+        disabledCount++;
+        continue;
+      }
+
+      table.set(item.path.toLowerCase(), item as RoutingRule);
     }
 
     lastEvaluatedKey = scanResult.LastEvaluatedKey;
   } while (lastEvaluatedKey);
 
-  console.log(`[Routing] Loaded ${table.size} routing rules from DynamoDB`);
+  console.log(`[Routing] Loaded ${table.size} enabled rules from DynamoDB (${totalScanned} scanned, ${disabledCount} disabled)`);
   return table;
 }
 
 /**
- * Get a routing rule for a given path, using longest-prefix-match.
+ * Get a routing rule for a given path, using longest-prefix-match for prefix rules.
  * Checks module-level cache first, refreshing if stale or empty.
  * 
- * Algorithm: Try path segments from longest to shortest:
- *   /cas/biology/faculty/smith → /cas/biology/faculty → /cas/biology → /cas
+ * Algorithm: 
+ * - Try exact match first: if rule exists AND matchType is 'exact', return only if path equals exactly.
+ * - If rule exists AND matchType is 'prefix' (or omitted), return (prefix match).
+ * - Walk prefix chain from longest to shortest for remaining prefix-match rules.
+ * 
+ * Examples:
+ *   Request: /cas/biology/faculty → tries /cas/biology/faculty, /cas/biology, /cas
+ *   Rule: {path: '/cas', matchType: 'prefix'} matches /cas and /cas/biology
+ *   Rule: {path: '/studentlink', matchType: 'exact'} matches /studentlink only, NOT /studentlink/foo
  */
 export async function getRoutingRule(
   path: string,
@@ -91,21 +112,45 @@ export async function getRoutingRule(
   const normalizedPath = path.toLowerCase().replace(/\/+$/, '') || '/';
   const segments = normalizedPath.split('/').filter(s => s.length > 0);
   
-  // Try full path first (exact match)
-  const exactMatch = cache.table.get(normalizedPath);
-  if (exactMatch) {
-    console.log(`[Routing] Exact match: ${path} (${exactMatch.routingType})`);
-    return exactMatch;
+  // Try full path first (exact match lookup)
+  const exactLookup = cache.table.get(normalizedPath);
+  if (exactLookup) {
+    const matchType = exactLookup.matchType || 'prefix';
+    
+    if (matchType === 'exact') {
+      // Exact-match rule: only return if path equals exactly (no sub-paths)
+      console.log(`[Routing] Exact match: ${path} (action: ${exactLookup.action})`);
+      return exactLookup;
+    } else {
+      // Prefix-match rule at exact path: return it
+      console.log(`[Routing] Prefix match (exact path): ${path} (action: ${exactLookup.action})`);
+      return exactLookup;
+    }
   }
 
-  // Try progressively shorter prefixes
+  // Try progressively shorter prefixes (only for prefix-match rules)
   for (let depth = segments.length - 1; depth >= 1; depth--) {
     const prefixPath = '/' + segments.slice(0, depth).join('/');
     const rule = cache.table.get(prefixPath);
     
     if (rule) {
-      console.log(`[Routing] Prefix match: ${path} → ${prefixPath} (${rule.routingType})`);
-      return rule;
+      const matchType = rule.matchType || 'prefix';
+      
+      if (matchType === 'prefix') {
+        console.log(`[Routing] Prefix match: ${path} → ${prefixPath} (action: ${rule.action})`);
+        return rule;
+      }
+      // If matchType is 'exact', skip it - it doesn't match this longer path
+    }
+  }
+
+  // Try root path '/'
+  const rootRule = cache.table.get('/');
+  if (rootRule) {
+    const matchType = rootRule.matchType || 'prefix';
+    if (matchType === 'prefix') {
+      console.log(`[Routing] Prefix match: ${path} → / (action: ${rootRule.action})`);
+      return rootRule;
     }
   }
 

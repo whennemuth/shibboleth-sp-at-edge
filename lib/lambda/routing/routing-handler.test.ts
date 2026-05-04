@@ -84,9 +84,9 @@ describe('routing-handler', () => {
     it('should return redirect response without calling auth handler', async () => {
       const redirectRule: RoutingRule = {
         path: '/old-page',
-        routingType: 'redirect',
+        action: 'redirect',
         redirectStatus: 301,
-        redirectTarget: 'https://www.bu.edu/new-page',
+        target: 'https://www.bu.edu/new-page',
       };
       mockGetRoutingRule.mockResolvedValue(redirectRule);
       const event = createMockEvent('/old-page');
@@ -107,9 +107,9 @@ describe('routing-handler', () => {
     it('should handle 302 redirect', async () => {
       const redirectRule: RoutingRule = {
         path: '/temp-redirect',
-        routingType: 'redirect',
+        action: 'redirect',
         redirectStatus: 302,
-        redirectTarget: 'https://www.bu.edu/temporary',
+        target: 'https://www.bu.edu/temporary',
       };
       mockGetRoutingRule.mockResolvedValue(redirectRule);
       const event = createMockEvent('/temp-redirect');
@@ -124,16 +124,84 @@ describe('routing-handler', () => {
         },
       });
     });
+
+    it('should preserve query string when preserveQuery is true', async () => {
+      const redirectRule: RoutingRule = {
+        path: '/old-page',
+        action: 'redirect',
+        redirectStatus: 301,
+        target: 'https://www.bu.edu/new-page',
+        preserveQuery: true,
+      };
+      mockGetRoutingRule.mockResolvedValue(redirectRule);
+      const event = createMockEvent('/old-page');
+      event.Records[0].cf.request.querystring = 'foo=1&bar=2';
+      
+      const result = await handler(event);
+      
+      expect(result).toEqual({
+        status: 301,
+        statusDescription: 'Moved Permanently',
+        headers: {
+          location: [{ key: 'Location', value: 'https://www.bu.edu/new-page?foo=1&bar=2' }],
+        },
+      });
+    });
+
+    it('should not preserve query string when preserveQuery is false', async () => {
+      const redirectRule: RoutingRule = {
+        path: '/old-page',
+        action: 'redirect',
+        redirectStatus: 301,
+        target: 'https://www.bu.edu/new-page',
+        preserveQuery: false,
+      };
+      mockGetRoutingRule.mockResolvedValue(redirectRule);
+      const event = createMockEvent('/old-page');
+      event.Records[0].cf.request.querystring = 'foo=1&bar=2';
+      
+      const result = await handler(event);
+      
+      expect(result).toEqual({
+        status: 301,
+        statusDescription: 'Moved Permanently',
+        headers: {
+          location: [{ key: 'Location', value: 'https://www.bu.edu/new-page' }],
+        },
+      });
+    });
+
+    it('should not preserve query string when preserveQuery is omitted', async () => {
+      const redirectRule: RoutingRule = {
+        path: '/old-page',
+        action: 'redirect',
+        redirectStatus: 301,
+        target: 'https://www.bu.edu/new-page',
+      };
+      mockGetRoutingRule.mockResolvedValue(redirectRule);
+      const event = createMockEvent('/old-page');
+      event.Records[0].cf.request.querystring = 'foo=1&bar=2';
+      
+      const result = await handler(event);
+      
+      expect(result).toEqual({
+        status: 301,
+        statusDescription: 'Moved Permanently',
+        headers: {
+          location: [{ key: 'Location', value: 'https://www.bu.edu/new-page' }],
+        },
+      });
+    });
   });
 
-  describe('when routing rule is a cluster routing', () => {
+  describe('when routing rule is an origin routing', () => {
     it('should modify origin and delegate to auth handler', async () => {
-      const clusterRule: RoutingRule = {
+      const originRule: RoutingRule = {
         path: '/admissions',
-        routingType: 'cluster',
-        targetOrigin: 'wp-alpha-alb-123.us-east-2.elb.amazonaws.com',
+        action: 'origin',
+        target: 'wp-alpha-alb-123.us-east-2.elb.amazonaws.com',
       };
-      mockGetRoutingRule.mockResolvedValue(clusterRule);
+      mockGetRoutingRule.mockResolvedValue(originRule);
       const event = createMockEvent('/admissions');
       
       await handler(event);
@@ -144,16 +212,14 @@ describe('routing-handler', () => {
       );
       expect(mockAuthHandler).toHaveBeenCalledWith(event);
     });
-  });
 
-  describe('when routing rule is static S3 routing', () => {
-    it('should modify origin and delegate to auth handler', async () => {
-      const staticRule: RoutingRule = {
+    it('should modify origin for S3 target', async () => {
+      const originRule: RoutingRule = {
         path: '/assets',
-        routingType: 'static',
-        targetOrigin: 'bu-static-assets.s3.amazonaws.com',
+        action: 'origin',
+        target: 'bu-static-assets.s3.amazonaws.com',
       };
-      mockGetRoutingRule.mockResolvedValue(staticRule);
+      mockGetRoutingRule.mockResolvedValue(originRule);
       const event = createMockEvent('/assets/logo.png');
       
       await handler(event);
@@ -165,21 +231,51 @@ describe('routing-handler', () => {
     });
   });
 
-  describe('when routing rule is PHP app routing', () => {
-    it('should modify origin and delegate to auth handler', async () => {
-      const phpRule: RoutingRule = {
-        path: '/phpbin',
-        routingType: 'php',
-        targetOrigin: 'phpbin-alb-456.us-east-2.elb.amazonaws.com',
+  describe('exact-match rules', () => {
+    it('should match exact path for exact-match rule', async () => {
+      const exactRule: RoutingRule = {
+        path: '/studentlink',
+        action: 'redirect',
+        matchType: 'exact',
+        redirectStatus: 301,
+        target: 'https://www.bu.edu/link',
       };
-      mockGetRoutingRule.mockResolvedValue(phpRule);
-      const event = createMockEvent('/phpbin/app');
+      mockGetRoutingRule.mockResolvedValue(exactRule);
+      const event = createMockEvent('/studentlink');
+      
+      const result = await handler(event);
+      
+      expect(mockGetRoutingRule).toHaveBeenCalledWith('/studentlink', expect.any(Object));
+      expect(result).toEqual({
+        status: 301,
+        statusDescription: 'Moved Permanently',
+        headers: {
+          location: [{ key: 'Location', value: 'https://www.bu.edu/link' }],
+        },
+      });
+    });
+
+    it('should not match sub-path for exact-match rule', async () => {
+      // Mock returns null for /studentlink/foo (exact-match rule filtered by cache)
+      mockGetRoutingRule.mockResolvedValue(null);
+      const event = createMockEvent('/studentlink/foo');
       
       await handler(event);
       
-      expect(event.Records[0].cf.request.origin.custom.domainName).toBe(
-        'phpbin-alb-456.us-east-2.elb.amazonaws.com'
-      );
+      expect(mockGetRoutingRule).toHaveBeenCalledWith('/studentlink/foo', expect.any(Object));
+      expect(mockAuthHandler).toHaveBeenCalledWith(event);
+    });
+  });
+
+  describe('disabled rules', () => {
+    it('should fall through when rule is disabled', async () => {
+      // Disabled rules are filtered by cache layer, so getRoutingRule returns null
+      mockGetRoutingRule.mockResolvedValue(null);
+      const event = createMockEvent('/disabled-path');
+      
+      await handler(event);
+      
+      expect(mockGetRoutingRule).toHaveBeenCalledWith('/disabled-path', expect.any(Object));
       expect(mockAuthHandler).toHaveBeenCalledWith(event);
     });
   });

@@ -75,6 +75,5 @@ export interface Tags {
 export interface RoutingConfig {
     enabled: boolean;
     tableName?: string;                        // Override default DynamoDB table name (optional)
-    defaultOriginType: 'webrouter' | 'wordpress';  // What unmatched paths fall through to
     cacheTtlSeconds?: number;                  // Cache TTL in seconds (default: 300 = 5 minutes)
 }

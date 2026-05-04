@@ -30,16 +30,14 @@ function applyRoutingRule(
   request: any,
   rule: RoutingRule
 ): any {
-  switch (rule.routingType) {
-    case 'cluster':
-    case 'static':
-    case 'php':
+  switch (rule.action) {
+    case 'origin':
       // Replace request.origin to route to a different ALB/origin.
       // Host header is NOT modified - WordPress multisite uses it for site selection.
       // CloudFront uses domainName for TLS connection (SNI); Host header is application-level.
       request.origin = {
         custom: {
-          domainName: rule.targetOrigin,
+          domainName: rule.target,
           port: 443,
           protocol: 'https',
           path: '',
@@ -49,24 +47,32 @@ function applyRoutingRule(
           customHeaders: {},  // Empty - auth handler adds challenge/app_authorization to request.headers
         },
       };
-      console.log(`[Routing] Modified origin to ${rule.targetOrigin} (${rule.routingType})`);
+      console.log(`[Routing] Modified origin to ${rule.target} (action: origin)`);
       return null; // Continue to auth handler
       
     case 'redirect':
+      // Build redirect Location header, optionally preserving query string
+      let redirectTarget = rule.target;
+      if (rule.preserveQuery && request.querystring) {
+        // Append query string to target
+        const separator = rule.target.includes('?') ? '&' : '?';
+        redirectTarget = `${rule.target}${separator}${request.querystring}`;
+      }
+      
       // Return redirect response immediately (skip auth)
-      console.log(`[Routing] Returning redirect ${rule.redirectStatus} → ${rule.redirectTarget}`);
+      console.log(`[Routing] Returning redirect ${rule.redirectStatus} → ${redirectTarget}`);
       return {
         status: rule.redirectStatus,
         statusDescription: getRedirectDescription(rule.redirectStatus),
         headers: {
-          location: [{ key: 'Location', value: rule.redirectTarget }],
+          location: [{ key: 'Location', value: redirectTarget }],
         },
       };
       
     default:
       // TypeScript exhaustiveness check
       const _exhaustive: never = rule;
-      console.error(`[Routing] Unknown routing type: ${JSON.stringify(rule)}`);
+      console.error(`[Routing] Unknown action: ${JSON.stringify(rule)}`);
       return null;
   }
 }
