@@ -1,8 +1,12 @@
 # Request Routing Layer
 
+Routing in CloudFront can be implemented by modifying the `request.origin` property in a Lambda@Edge function. Some distributions may benefit from a routing function that can be optionally layered on top of the authentication function.
+
 ## Overview
 
 The routing layer enables a single CloudFront distribution with one authentication stack to serve multiple backend clusters or static origins. Requests are directed to different backend ALBs, S3 origins, or redirects based on URL path patterns, without duplicating the Shibboleth authentication infrastructure.
+
+Because the authorization is using the viewer-request and origin-request stages, the routing function is implemented as a wrapper around the origin-request handler.
 
 ## Architecture
 
