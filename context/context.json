@@ -40,7 +40,6 @@
     "Ticket": "WP_MIGRATION_TBD"
   },
   "ROUTING": {
-    "enabled": false,
-    "defaultOriginType": "webrouter"
+    "enabled": false
   }
 }
