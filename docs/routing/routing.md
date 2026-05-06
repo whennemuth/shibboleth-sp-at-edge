@@ -308,8 +308,7 @@ Requests go to the default origin even when a DynamoDB rule exists.
 4. **Re-enable latency.** Disabled rules take up to `cacheTtlSeconds` (default 5 minutes) to take effect after re-enabling.
 5. **Manual rule management.** No built-in validation or write tooling yet. Rules are edited via AWS console or custom scripts.
 
-## Related Documentation
+## Related Code
 
 - [lib/lambda/routing/routing-handler.ts](../../lib/lambda/routing/routing-handler.ts) — Implementation
 - [lib/lambda/routing/types.ts](../../lib/lambda/routing/types.ts) — Schema contract
-- [lib/Distribution.ts](../../lib/Distribution.ts) — CloudFront construct with SAML path handling
