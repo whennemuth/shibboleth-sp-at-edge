@@ -6,13 +6,17 @@ Routing in CloudFront can be implemented by modifying the `request.origin` prope
 
 The routing layer enables a single CloudFront distribution with one authentication stack to serve multiple backend clusters or static origins. Requests are directed to different backend ALBs, S3 origins, or redirects based on URL path patterns, without duplicating the Shibboleth authentication infrastructure.
 
-Because the authorization is using the viewer-request and origin-request stages, the routing function is implemented as a wrapper around the origin-request handler.
+The viewer-request stage in these distributions is occupied by JWT validation; routing is therefore composed at origin-request, where the auth handler already runs and origin modification is straightforward. The routing function is implemented as a wrapper around the existing origin-request handler.
 
 ## Architecture
 
-The routing layer is a path-based router that runs after JWT validation but before SAML processing — added to the existing origin-request Lambda by way of a thin wrapper that delegates to the auth handler unchanged.
+The diagram below shows the topology that the routing layer enables: distributions and clusters become independently changeable. Routing-enabled distributions can direct traffic to any cluster ALB; non-routing distributions remain pinned to their primary origin.
 
-When `ROUTING.enabled` is true in context.json, the CDK synthesis-time decision in [lib/EdgeFunctionOriginRequest.ts](../../lib/EdgeFunctionOriginRequest.ts) deploys `routing-handler.js` instead of `edge-origin-request.js`. When routing is disabled or absent, the deployed function is the auth-only handler — byte-for-byte identical to pre-routing versions of the repo. The feature is fully opt-in: with `ROUTING.enabled` set to false or omitted, no DynamoDB resources are created and no routing code is bundled into the Lambda.
+![Distribution-to-cluster routing topology](routing-chart.png)
+
+The routing layer is a path-based router that runs after JWT validation but before SAML processing — added to the existing origin-request Lambda by way of a thin wrapper that delegates to the (unchanged) auth handler.
+
+When `ROUTING.enabled` is true in context.json, the CDK synthesis-time decision in [lib/EdgeFunctionOriginRequest.ts](../../lib/EdgeFunctionOriginRequest.ts) deploys `routing-handler.js` instead of `edge-origin-request.js`. When routing is disabled or absent, the deployed function is the auth-only handler — unaltered from the pre-routing versions. The feature is fully opt-in: with `ROUTING.enabled` set to false or omitted, no DynamoDB resources are created and no routing code is bundled into the Lambda.
 
 ### Request Flow
 
@@ -34,25 +38,31 @@ User → CloudFront
 Queries DynamoDB for routing rules based on request path, modifies `request.origin` if a rule matches, then delegates to the auth handler. Preserves all auth handler functionality (SAML, JWT, security headers).
 
 **DynamoDB Routing Table**
-This is a persistent data store for the routing rules, and is cached in-memory within the Lambda for performance. It uses a similar approach as the `bu-protected-s3-object-lambda` infrastructure.
+Persistent storage for routing rules, cached in-memory at module scope within the Lambda. The caching pattern (module-level Map with TTL) follows `bu-protected-s3-object-lambda`; the access pattern (Scan rather than Get) differs for functional reasons — see [Why DynamoDB](#why-dynamodb) below.
 
 ## Design Principles
 
-### Authentication before routing
+### Distributions and clusters can be independently associated
 
-The routing handler runs after JWT validation (viewer-request) but before SAML processing (origin-request). Unauthenticated requests are blocked at the edge before any DynamoDB lookup. SAML paths (`/login`, `/assert`, `/logout`) have separate cache behaviors without routing functions, verified in [lib/Distribution.test.ts](../../lib/Distribution.test.ts).
+A single CloudFront distribution can route to any backend cluster, and a single cluster can be reached from any distribution. 
 
-### Avoid header duplication
+### Opt-in to zero cost
 
-The routing handler must not pre-populate `request.origin.custom.customHeaders` with any headers that the auth handler adds to `request.headers`. CloudFront returns 502 if the same header exists in both places simultaneously.
+When `ROUTING.enabled` is false or absent, the deployed Lambda is byte-for-byte identical to the pre-routing version, no DynamoDB resources are created, and no routing code is bundled into the Lambda. The feature adds functionality only for distributions that elect to use it. Distributions that do not opt in are unaffected by the routing components.
 
-**1. Empty customHeaders requirement**
+### Coexistence with the auth handler
 
-The routing handler must set `request.origin.custom.customHeaders = {}` when modifying origin. CloudFront returns 502 "invalid origin configuration" if the same header exists in both `origin.custom.customHeaders` and `request.headers` simultaneously. The auth handler adds security headers (`cloudfront-challenge`, `app_authorization`) to `request.headers`. If the routing handler pre-populates customHeaders, the auth handler's additions create dual-location state and trigger the 502 error. Leaving customHeaders empty ensures all headers exist in `request.headers` only.
+The routing handler does not modify any properties that are used by the auth handler. Two specific constraints follow this requirement:
 
-**2. Host header preservation**
+**Empty `customHeaders`.** The routing handler must set `request.origin.custom.customHeaders = {}` when modifying origin. CloudFront returns 502 "invalid origin configuration" if the same header exists in both `origin.custom.customHeaders` and `request.headers` simultaneously. The auth handler adds security headers (`cloudfront-challenge`, `app_authorization`) to `request.headers`. Pre-populating `customHeaders` in the routing handler creates dual-location state and triggers the 502.
 
-The routing handler modifies `request.origin.custom.domainName` (the ALB DNS name for TLS connection and routing) but does not modify `request.headers['host']`. CloudFront uses `domainName` for the TLS handshake (SNI) and connection routing. WordPress uses the `Host` header for site selection within a multisite cluster. Preserving the original Host header enables cluster routing without breaking WordPress multisite.
+**Host header preserved.** The routing handler modifies `request.origin.custom.domainName` (the ALB DNS name CloudFront uses for the TLS handshake and connection routing) but does not modify `request.headers['host']`. WordPress uses `Host` for site selection within a multisite cluster. Modifying it would break multisite routing on the cluster side.
+
+Both constraints are documented at the source — see the comment block in `applyRoutingRule` in [routing-handler.ts](../../lib/lambda/routing/routing-handler.ts) — and verified at the cache-behavior level by [lib/Distribution.test.ts](../../lib/Distribution.test.ts) for SAML path exclusion.
+
+### The runtime data plane has no opinion about source of truth
+
+The Lambda reads from DynamoDB. It does not assume anything about how rules got there. Direct console editing, a CLI script that upserts a YAML file, a GitHub Action triggered on PR-merge, an internal UI, or a `sites.map`-to-DynamoDB transformer can all coexist as paths to populate the same table — they only have to conform to the rule contract defined in [types.ts](../../lib/lambda/routing/types.ts). This is a deliberate decoupling: it lets the right write path emerge from real use rather than being committed to up front, and any future write path needs only to conform to the schema.
 
 ## Configuration
 
@@ -92,15 +102,15 @@ The routing rules consumed by the handler are stored in a per-stack DynamoDB tab
 - **Table name:** `{STACK_ID}-routing-table-{Landscape}`
 - **Schema:** Partition key `path` (string), attributes vary by action type
 
-**Path matching:** Paths are case-insensitive. Both keys and lookups are normalized to lowercase. WordPress routes are de-facto case-insensitive at BU.
+**Path matching:** Paths are case-insensitive. Both keys and lookups are normalized to lowercase - see [Rule Matching Behavior](#rule-matching-behavior) below.
 
 Example rules:
 
 ```json
 {
-  "path": "/questrom",
+  "path": "/special",
   "action": "origin",
-  "target": "questrom-alb-123.us-east-2.elb.amazonaws.com",
+  "target": "special-alb-123.us-east-2.elb.amazonaws.com",
   "matchType": "prefix",
   "enabled": true
 }
@@ -112,7 +122,7 @@ Example rules:
   "action": "redirect",
   "matchType": "exact",
   "redirectStatus": 301,
-  "target": "https://www.bu.edu/link",
+  "target": "https://www.example.edu/link",
   "preserveQuery": false,
   "enabled": true
 }
@@ -120,27 +130,25 @@ Example rules:
 
 ## Why DynamoDB
 
-A recurring question when reviewing this implementation: *if the Lambda loads the whole table on every cache event, why use DynamoDB at all? Why not a JSON file in S3, or a parameter in SSM?*
+An obvious question when reviewing this implementation: *if the Lambda loads the whole table on every cache event, why use DynamoDB at all? Why not a JSON file in S3, or a parameter in SSM?*
 
 ### The ability to support longest-prefix-match favors "load everything"
 
-It can be beneficial to use a matching algorithm that is longest-prefix-match over URL paths. A request for `/cas/biology/faculty/smith` walks the path hierarchy from longest to shortest (`/cas/biology/faculty` → `/cas/biology` → `/cas`) and returns the first matching rule. There is no single key the Lambda can compute up front to retrieve one rule. The alternative—issuing five to ten single-key `Get` requests per incoming request to walk the prefix chain, most of which would miss—trades one warm-container Scan for sustained per-request latency. Loading the full table once per container and matching in memory is a good match for this scenario **regardless of the storage medium**.
+It can be beneficial to use a matching algorithm that is longest-prefix-match over URL paths. A request for `/cas/biology/faculty/smith` walks the path hierarchy from longest to shortest (`/cas/biology/faculty` → `/cas/biology` → `/cas`) and returns the first matching rule. There is no single key the Lambda can compute up front to retrieve one rule. The alternative — issuing five to ten single-key `Get` requests per incoming request to walk the prefix chain, most of which would miss — trades one warm-container Scan for sustained per-request latency. Loading the full table once per container and matching in memory is a good match for this scenario **regardless of the storage medium**.
 
 ### Once "load everything" is decided, storage choice is operational
 
-DynamoDB has beneficial properties for this use case:
+DynamoDB has two beneficial properties for this use case:
 
 1. **Atomic per-rule writes.** A `PutItem` call is safe under concurrent edits. An S3-backed JSON file requires read-modify-write with locking or last-writer-wins semantics. Both are error-prone when multiple team members edit rules simultaneously.
 
 2. **Console editor.** The AWS DynamoDB console provides a usable per-item editor out of the box. This matters most during Phase 1, when cluster assignments are mutated occasionally by team members for whom "edit the JSON blob in S3" is friction. An S3-backed JSON file is cheaper on paper but worse operationally.
 
-3. **Performance.** DynamoDB is much faster than S3 in general, and is one of the fastest options for Lambda in CloudFront. If we fall through from cache more often than expected for some reason, DynamoDB's low latency is a safety net.
-
 ### Cached DynamoDB is a previously used pattern, but we are using it in a different way
 
 The `bu-protected-s3-object-lambda` project is a partial precedent. The **module-level container caching pattern with TTL** is the same: compare `cachedProtectedSites` in `app.js` to `RoutingCache.ts`'s exported state. The **DynamoDB access pattern is different**: the S3 object lambda does a single `GetItem` against `PK='PROTECTED_SITES'` and `JSON.parse`s a blob, plus per-group `GetItem`s by composite key. It does not Scan.
 
-The routing table Scans in order to support longest-prefix-match, which needs the whole table.  The S3 object lambda doesn't Scan because its lookups are exact-key.
+The routing table Scans in order to support longest-prefix-match, which needs the whole table. The S3 object lambda doesn't Scan because its lookups are exact-key.
 
 ### Why not store the whole table as one JSON-encoded item?
 
@@ -148,7 +156,7 @@ A single item at `PK='ROUTING_TABLE'` containing the full rule set as a JSON blo
 
 ## Routing Actions
 
-The schema uses two action types: `origin` and `redirect`. Each describes what the rule does at runtime.
+The schema uses two action types: `origin` and `redirect`.
 
 ### origin
 
@@ -194,8 +202,8 @@ Returns a redirect response immediately without contacting origin or running the
 - `action: 'redirect'` — Required discriminator
 - `path: string` — Required. URL path to match (case-insensitive).
 - `target: string` — Required. Fully-qualified URL **WITH scheme**.  
-  Valid: `'https://www.bu.edu/admissions'`  
-  Invalid: `'www.bu.edu/admissions'` (missing scheme)
+  Valid: `'https://www.example.edu/admissions'`  
+  Invalid: `'www.example.edu/admissions'` (missing scheme)
 - `redirectStatus: 301 | 302 | 303 | 307 | 308` — Required. HTTP redirect status code.  
   `301`: Moved Permanently  
   `302`: Found (temporary)  
@@ -251,19 +259,19 @@ Rules with `enabled: false` are filtered out by the cache layer at load time. Th
 
 ### Case-insensitivity
 
-All paths are normalized to lowercase during lookup. WordPress routes are de-facto case-insensitive at BU. This is a semantic choice, not an implementation detail.
+All paths are normalized to lowercase during lookup. WordPress routes are de-facto case-insensitive at BU. This is a semantic choice, documented at the source in `RoutingCache.ts` and `types.ts`.
 
-## Performance and Scaling
+## Performance
 
-The cache pattern (module-level Map with ~5 minute TTL) provides sub-millisecond lookups on warm containers. Cold start overhead: 50–100 ms for DynamoDB client initialization plus 20–50 ms for the initial Scan.
+The cache pattern (module-level Map with TTL) is designed for sub-millisecond lookups on warm containers. Cold-start cost is bounded by SDK initialization plus a single DynamoDB Scan, and the Scan response is itself bounded (1 MB single-page response, with pagination implemented in [RoutingCache.ts](../../lib/lambda/routing/RoutingCache.ts) for tables that exceed it). Cache refresh latency is bounded by the same shape.
 
-The binding limit is the DynamoDB Scan response size (1 MB). At ~300 bytes per rule, the single-page Scan ceiling is approximately 3,000 rules. Current expected use cases hold dozens of rules; the ceiling is a far-future concern. Pagination is implemented in [lib/lambda/routing/RoutingCache.ts](../../lib/lambda/routing/RoutingCache.ts) for tables that exceed 1 MB.
+Specific characterization — a clean decomposition of cold-container, cache-miss, and cache-hit costs — is a forthcoming dedicated work stream. Current theory is that the resulting latencies should be acceptable for the routing layer's role; measurement will confirm and will inform decisions about cache TTL, observability, and scale ceilings before any production rollout.
 
 ## Operational Considerations
 
 ### Deployment
 
-Routing rule changes in DynamoDB take effect within 5 minutes (cache TTL). No Lambda redeployment is needed unless routing logic changes.
+Routing rule changes in DynamoDB take effect within the cache TTL (default 5 minutes). No Lambda redeployment is needed unless routing logic changes.
 
 ### Testing
 
@@ -287,20 +295,21 @@ Requests go to the default origin even when a DynamoDB rule exists.
 **Causes:**
 
 1. Context not rebuilt — run `npm run build` after changing `ROUTING.enabled`.
-2. DynamoDB TTL cache stale — wait 5 minutes after rule updates.
+2. In-memory cache stale — the Lambda module-level cache holds the routing table for up to `cacheTtlSeconds` (default 5 minutes) after each refresh. Wait for the next refresh after rule updates.
 3. Path doesn't match — check the exact path in DynamoDB against the request URL.
 
-**Debug:** Check Lambda@Edge logs in CloudWatch Logs (us-east-1). The handler logs routing decisions with `[Routing]` prefix.
+**Debug:** Check Lambda@Edge logs in CloudWatch Logs. The handler logs routing decisions with `[Routing]` prefix.
 
 ## Known Limitations
 
 1. **Regex not supported.** Path matching is exact or prefix-based only. Complex patterns require multiple rules or upstream/downstream transformation.
 2. **Single-table Scan design.** Partitioning may be necessary above ~3,000 rules if Scan latency becomes problematic (the 1 MB Scan response limit is the ceiling).
-3. **Cold-start DynamoDB query.** The first request after a Lambda cold start queries DynamoDB (no cache yet). Warm containers use the in-memory cache.
+3. **Cold-start DynamoDB query.** The first request after a Lambda cold start queries DynamoDB (no cache yet). Warm containers use the in-memory cache. Performance characterization is pending — see [Performance](#performance).
 4. **Re-enable latency.** Disabled rules take up to `cacheTtlSeconds` (default 5 minutes) to take effect after re-enabling.
 5. **Manual rule management.** No built-in validation or write tooling yet. Rules are edited via AWS console or custom scripts.
 
 ## Related Documentation
 
 - [lib/lambda/routing/routing-handler.ts](../../lib/lambda/routing/routing-handler.ts) — Implementation
+- [lib/lambda/routing/types.ts](../../lib/lambda/routing/types.ts) — Schema contract
 - [lib/Distribution.ts](../../lib/Distribution.ts) — CloudFront construct with SAML path handling
