@@ -27,7 +27,7 @@ let ddbDocClient: DynamoDBDocumentClient;
 
 /**
  * Load the full routing table from DynamoDB using Scan.
- * For BU's 1,829 rules (~366 KB), a single scan response is typical.
+ * For for around 2000 rules (~400 KB), a single scan response is typical.
  * Implements pagination for tables that exceed 1 MB response limit.
  * 
  * Filters out disabled rules (enabled === false) at load time.
