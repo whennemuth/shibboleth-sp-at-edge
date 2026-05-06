@@ -46,7 +46,7 @@ Persistent storage for routing rules, cached in-memory at module scope within th
 
 A single CloudFront distribution can route to any backend cluster, and a single cluster can be reached from any distribution. 
 
-### Opt-in to zero cost
+### Routing is Opt-in
 
 When `ROUTING.enabled` is false or absent, the deployed Lambda is byte-for-byte identical to the pre-routing version, no DynamoDB resources are created, and no routing code is bundled into the Lambda. The feature adds functionality only for distributions that elect to use it. Distributions that do not opt in are unaffected by the routing components.
 
