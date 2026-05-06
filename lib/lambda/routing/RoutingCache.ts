@@ -97,7 +97,7 @@ export async function getRoutingRule(
 ): Promise<RoutingRule | null> {
   const now = Date.now();
   const ttlMs = config.ttlSeconds * 1000;
-  const region = config.region || 'us-east-2';  // Default to us-east-2 for BU
+  const region = config.region || 'us-east-1';  // Default to us-east-1 if not specified.
 
   // Check if cache is empty or expired
   if (cache.table.size === 0 || now - cache.timestamp > ttlMs) {
