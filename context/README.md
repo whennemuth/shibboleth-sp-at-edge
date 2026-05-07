@@ -44,6 +44,11 @@ This stack can be configured against two modes:
   - "no-cache": *default*, Cloudfront will not cache any content from the origin. Every request will be passed through to the origin.
   - "standard": Cloudfront will apply a typical caching strategy.
   - "bu-cache": Cloudfront will apply a caching strategy customized for BU websites.
+- ROUTING: *(Optional)* Enables Lambda@Edge-based URL routing with DynamoDB for multi-cluster routing, redirects, and static content serving. When absent or `enabled: false`, the distribution deploys without routing (standard Shibboleth auth-only mode).
+  - enabled: *boolean* - Set to `true` to enable routing functionality. Default: `false`
+  - tableName: *(Optional)* - Override the default DynamoDB table name. Default: `{STACK_ID}-routing-table-{Landscape}`
+  - cacheTtlSeconds: *(Optional)* - Cache TTL in seconds for routing rules. Default: `300` (5 minutes)
+  - **Note**: The DynamoDB table starts empty and must be populated via AWS SDK or scripts. Routing rules include path, routingType, and targetOrigin fields. See routing documentation for the complete schema.
 - SHIBBOLETH:
   - entityId: The ID of your application service provider
   - idpCert: The public key as published by shibboleth at the IDP entity ID endpoint.

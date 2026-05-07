@@ -1,7 +1,6 @@
 import { CfnOutput, Duration, RemovalPolicy } from 'aws-cdk-lib';
 import { Certificate, ICertificate } from 'aws-cdk-lib/aws-certificatemanager';
-import { AllowedMethods, BehaviorOptions, CacheCookieBehavior, CacheHeaderBehavior, CachePolicy, CachePolicyProps, CacheQueryStringBehavior, Distribution, DistributionProps, EdgeLambda, OriginRequestPolicy, PriceClass, ViewerProtocolPolicy } from 'aws-cdk-lib/aws-cloudfront';
-import { NodejsFunction } from 'aws-cdk-lib/aws-lambda-nodejs';
+import { AllowedMethods, BehaviorOptions, CacheCookieBehavior, CacheHeaderBehavior, CachePolicy, CachePolicyProps, CacheQueryStringBehavior, Distribution, DistributionProps, EdgeLambda, FunctionAssociation, FunctionEventType, OriginRequestPolicy, PriceClass, ViewerProtocolPolicy, experimental } from 'aws-cdk-lib/aws-cloudfront';
 import { Bucket, ObjectOwnership } from 'aws-cdk-lib/aws-s3';
 import { Construct } from 'constructs';
 import { AUTH_PATHS } from 'shibboleth-sp';
@@ -12,8 +11,10 @@ import { createEdgeFunctionForViewerResponse } from './EdgeFunctionViewerRespons
 import { HttpOriginBase } from './Origin';
 import { getAlbOrigin } from './OriginAlb';
 import { getFunctionUrlOrigin } from './OriginFunctionUrl';
+// Routing construct — only instantiated when context.ROUTING?.enabled
+import { RoutingTable } from './routing/RoutingTable';
 import type { IRoute53HostedZone } from './Route53';
-import { getStackName, ParameterTester } from './Util';
+import { getStackName, ParameterTester } from './util';
 import path = require('path');
 
 /**
@@ -32,7 +33,7 @@ export class CloudfrontDistribution extends Construct {
   
   private stack:Construct;
   private context:IContext;
-  private edgeFunctionForOriginRequest:NodejsFunction|undefined;
+  private edgeFunctionForOriginRequest:experimental.EdgeFunction|undefined;
   private edgeLambdas = [] as EdgeLambda[];
   private origin:HttpOriginBase;
   private testOrigin:HttpOriginBase;
@@ -65,14 +66,25 @@ export class CloudfrontDistribution extends Construct {
     createEdgeFunctionForViewerRequest(scope, context, (edgeLambda:any) => {
       edgeLambdas.push(edgeLambda);
     });
-    createEdgeFunctionForOriginRequest(scope, context, (edgeLambda:any) => {
+    createEdgeFunctionForOriginRequest(scope, context, (edgeLambda:any, edgeFunction:experimental.EdgeFunction) => {
       edgeLambdas.push(edgeLambda);
-      this.edgeFunctionForOriginRequest = edgeLambda;
+      this.edgeFunctionForOriginRequest = edgeFunction;
     });
     createEdgeFunctionForViewerResponse(scope, context, (edgeLambda:any) => {
       edgeLambdas.push(edgeLambda);
     });
     const { edgeFunctionForOriginRequest } = this;
+
+    // 2.5) Create routing infrastructure if enabled
+    if (context.ROUTING?.enabled) {
+      const routingTableConstruct = new RoutingTable(this, 'RoutingTable', context);
+      const routingTable = routingTableConstruct.table;
+      
+      // Grant the origin-request Lambda read access to the routing table
+      if (edgeFunctionForOriginRequest) {
+        routingTable.grantReadData(edgeFunctionForOriginRequest);
+      }
+    }
 
     // 3) Create the primary origin if indicated.
     if(httpOriginBase) {
@@ -249,7 +261,7 @@ export class CloudfrontDistribution extends Construct {
           isFunctionUrlOrigin ? 
             ALL_VIEWER_EXCEPT_HOST_HEADER /** function url */ : 
             ALL_VIEWER /** alb */
-        ) : ALL_VIEWER_EXCEPT_HOST_HEADER, // See NOTE 2        
+        ) : ALL_VIEWER_EXCEPT_HOST_HEADER, // See NOTE 2
       } as BehaviorOptions;
 
       switch(cachePolicy) {
@@ -292,12 +304,14 @@ export class CloudfrontDistribution extends Construct {
     /**
      * @returns A behavior for the test origin if no primary origin is configured in context.json, 
      * else a behavior based on the configured origin.
+     * 
+     * The default behavior includes the routing function (if enabled via context.ROUTING).
      */
     const getDefaultBehavior = ():BehaviorOptions => {
       if(origin) {
-        return getBehavior(origin, customDomain());
+        return getBehavior(origin, customDomain(), false);
       }
-      return getBehavior(testOrigin, false);
+      return getBehavior(testOrigin, false, false);
     }
 
     // Configure distribution properties

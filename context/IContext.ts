@@ -9,6 +9,7 @@ export interface IContext {
     CLOUDFRONT_CACHING_STRATEGY?:       CloudFrontCachingStrategy;
     SHIBBOLETH:                         Shibboleth;
     TAGS:                               Tags;
+    ROUTING?:                           RoutingConfig;
 }
 
 export enum CloudFrontCachingStrategy {
@@ -69,4 +70,10 @@ export interface Tags {
     Landscape: string;
     CostCenter?: string;
     Ticket?: string;
+}
+
+export interface RoutingConfig {
+    enabled: boolean;
+    tableName?: string;                        // Override default DynamoDB table name (optional)
+    cacheTtlSeconds?: number;                  // Cache TTL in seconds (default: 300 = 5 minutes)
 }

@@ -1,5 +1,5 @@
 import { Duration, Fn } from "aws-cdk-lib";
-import { OriginProtocolPolicy } from "aws-cdk-lib/aws-cloudfront";
+import { OriginProtocolPolicy, experimental } from "aws-cdk-lib/aws-cloudfront";
 import { HttpOrigin, HttpOriginProps } from "aws-cdk-lib/aws-cloudfront-origins";
 import { FunctionUrl, FunctionUrlAuthType, Runtime } from "aws-cdk-lib/aws-lambda";
 import { NodejsFunction } from "aws-cdk-lib/aws-lambda-nodejs";
@@ -12,7 +12,7 @@ export type OriginFunctionUrlConfig = {
   origin:OriginFunctionUrl,
   stack: Construct, 
   context: IContext, 
-  edgeFunctionForOriginRequest:NodejsFunction|undefined
+  edgeFunctionForOriginRequest:experimental.EdgeFunction|undefined
 }
 
 export const getFunctionUrlOrigin = (config:OriginFunctionUrlConfig): HttpOriginBase  => {
