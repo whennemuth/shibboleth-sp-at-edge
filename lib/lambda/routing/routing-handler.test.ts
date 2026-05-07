@@ -279,4 +279,149 @@ describe('routing-handler', () => {
       expect(mockAuthHandler).toHaveBeenCalledWith(event);
     });
   });
+
+  describe('rewriteHostHeader', () => {
+    it('should rewrite Host header when rewriteHostHeader is true', async () => {
+      const originRule: RoutingRule = {
+        path: '/static-test',
+        action: 'origin',
+        target: 'static-sites-prod-public.s3-website-us-east-1.amazonaws.com',
+        rewriteHostHeader: true,
+      };
+      mockGetRoutingRule.mockResolvedValue(originRule);
+      const event = createMockEvent('/static-test');
+      event.Records[0].cf.request.headers.host = [{ key: 'Host', value: 'www.bu.edu' }];
+      
+      await handler(event);
+      
+      expect(event.Records[0].cf.request.headers.host[0].value).toBe(
+        'static-sites-prod-public.s3-website-us-east-1.amazonaws.com'
+      );
+      expect(mockAuthHandler).toHaveBeenCalledWith(event);
+    });
+
+    it('should preserve original Host header when rewriteHostHeader is false or omitted', async () => {
+      const originRule: RoutingRule = {
+        path: '/admissions',
+        action: 'origin',
+        target: 'wp-cluster-alb.example.com',
+        // rewriteHostHeader omitted (defaults to false)
+      };
+      mockGetRoutingRule.mockResolvedValue(originRule);
+      const event = createMockEvent('/admissions');
+      event.Records[0].cf.request.headers.host = [{ key: 'Host', value: 'www.bu.edu' }];
+      
+      await handler(event);
+      
+      expect(event.Records[0].cf.request.headers.host[0].value).toBe('www.bu.edu');
+      expect(mockAuthHandler).toHaveBeenCalledWith(event);
+    });
+  });
+
+  describe('originPath', () => {
+    it('should set origin path when originPath is provided', async () => {
+      const originRule: RoutingRule = {
+        path: '/people-test',
+        action: 'origin',
+        target: 'ist-web-static-sites-prod.bu.edu',
+        originPath: '/_domains/people.bu.edu',
+      };
+      mockGetRoutingRule.mockResolvedValue(originRule);
+      const event = createMockEvent('/people-test');
+      
+      await handler(event);
+      
+      expect(event.Records[0].cf.request.origin.custom.path).toBe('/_domains/people.bu.edu');
+      expect(mockAuthHandler).toHaveBeenCalledWith(event);
+    });
+
+    it('should set origin path to empty string when originPath is omitted', async () => {
+      const originRule: RoutingRule = {
+        path: '/admissions',
+        action: 'origin',
+        target: 'wp-cluster-alb.example.com',
+        // originPath omitted
+      };
+      mockGetRoutingRule.mockResolvedValue(originRule);
+      const event = createMockEvent('/admissions');
+      
+      await handler(event);
+      
+      expect(event.Records[0].cf.request.origin.custom.path).toBe('');
+      expect(mockAuthHandler).toHaveBeenCalledWith(event);
+    });
+  });
+
+  describe('preservePath', () => {
+    it('should append request URI when preservePath is true', async () => {
+      const redirectRule: RoutingRule = {
+        path: '/parking',
+        action: 'redirect',
+        redirectStatus: 302,
+        target: 'https://www.bu.edu/parking-and-transportation',
+        preservePath: true,
+      };
+      mockGetRoutingRule.mockResolvedValue(redirectRule);
+      const event = createMockEvent('/parking/permits/staff');
+      
+      const result = await handler(event);
+      
+      expect(result).toEqual({
+        status: 302,
+        statusDescription: 'Found',
+        headers: {
+          location: [{ 
+            key: 'Location', 
+            value: 'https://www.bu.edu/parking-and-transportation/parking/permits/staff' 
+          }],
+        },
+      });
+    });
+
+    it('should not append request URI when preservePath is false or omitted', async () => {
+      const redirectRule: RoutingRule = {
+        path: '/agganis',
+        action: 'redirect',
+        redirectStatus: 302,
+        target: 'https://www.agganisarena.com',
+        // preservePath omitted (defaults to false)
+      };
+      mockGetRoutingRule.mockResolvedValue(redirectRule);
+      const event = createMockEvent('/agganis/some/path');
+      
+      const result = await handler(event);
+      
+      expect(result).toEqual({
+        status: 302,
+        statusDescription: 'Found',
+        headers: {
+          location: [{ key: 'Location', value: 'https://www.agganisarena.com' }],
+        },
+      });
+    });
+
+    it('should append both path and query string when both preservePath and preserveQuery are true', async () => {
+      const redirectRule: RoutingRule = {
+        path: '/foo',
+        action: 'redirect',
+        redirectStatus: 302,
+        target: 'https://example.com/new',
+        preservePath: true,
+        preserveQuery: true,
+      };
+      mockGetRoutingRule.mockResolvedValue(redirectRule);
+      const event = createMockEvent('/foo/bar');
+      event.Records[0].cf.request.querystring = 'a=1&b=2';
+      
+      const result = await handler(event);
+      
+      expect(result).toEqual({
+        status: 302,
+        statusDescription: 'Found',
+        headers: {
+          location: [{ key: 'Location', value: 'https://example.com/new/foo/bar?a=1&b=2' }],
+        },
+      });
+    });
+  });
 });

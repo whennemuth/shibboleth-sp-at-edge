@@ -173,6 +173,8 @@ Modifies `request.origin` to direct traffic to a different ALB or S3 origin. The
 - `matchType?: 'exact' | 'prefix'` — Optional, defaults to `'prefix'`.  
   `'exact'`: Rule matches only the literal path. Request for `/studentlink/foo` does NOT match rule `/studentlink`.  
   `'prefix'`: Rule matches the path and all sub-paths (current behavior).
+- `rewriteHostHeader?: boolean` — Optional, defaults to `false`. When `true`, sets the Host header to `target` before forwarding to origin. Required for S3 website endpoints (which use Host to determine bucket/content). Must remain `false` for ALB origins serving WordPress multisite (which uses Host for site selection).
+- `originPath?: string` — Optional, omit for no prefix. CloudFront's native origin-path mechanism prepends this string to the request URI. Example: `/admissions` with `originPath: '/_domains/example.com'` becomes `/_domains/example.com/admissions` at origin. Use for origins serving multiple logical hosts via path namespacing. Format: must start with `/`, must NOT end with `/`.
 - `enabled?: boolean` — Optional, defaults to `true`. When `false`, the rule is filtered out by the cache layer at load time.
 - `metadata?: object` — Optional audit fields (`createdAt`, `updatedAt`, `createdBy`). Populated by write tools, not enforced.
 - `description?: string` — Optional human-readable description.
@@ -186,12 +188,17 @@ request.origin = {
     port: 443,
     protocol: 'https',
     customHeaders: {},  // Empty - auth handler adds headers to request.headers
-    path: '',
+    path: rule.originPath || '',  // Origin path prefix if provided
     sslProtocols: ['TLSv1.2'],
     readTimeout: 60,
     keepaliveTimeout: 5
   }
 };
+
+// Conditionally rewrite Host header for S3 origins
+if (rule.rewriteHostHeader) {
+  request.headers.host = [{ key: 'Host', value: rule.target }];
+}
 ```
 
 ### redirect
@@ -212,6 +219,7 @@ Returns a redirect response immediately without contacting origin or running the
   `308`: Permanent Redirect (preserves method)
 - `preserveQuery?: boolean` — Optional, defaults to `false`. When `true`, appends `request.querystring` to the redirect target.  
   Example: Request `/old?foo=1`, target `https://new.example.com`, produces `Location: https://new.example.com?foo=1`.
+- `preservePath?: boolean` — Optional, defaults to `false`. When `true`, appends the original request URI to the redirect target. Example: Request `/parking/permits/staff`, target `https://www.bu.edu/parking-and-transportation`, produces `Location: https://www.bu.edu/parking-and-transportation/parking/permits/staff`. Combines with `preserveQuery` (path appended first, then query).
 - `matchType?: 'exact' | 'prefix'` — Optional, defaults to `'prefix'`. Same semantics as origin rules.
 - `enabled?: boolean` — Optional, defaults to `true`.
 - `metadata?: object` — Optional audit fields.
@@ -221,9 +229,16 @@ Returns a redirect response immediately without contacting origin or running the
 
 ```javascript
 let redirectTarget = rule.target;
+
+// Append original request URI if preservePath is true
+if (rule.preservePath && request.uri) {
+  redirectTarget = `${rule.target}${request.uri}`;
+}
+
+// Append query string if preserveQuery is true
 if (rule.preserveQuery && request.querystring) {
-  const separator = rule.target.includes('?') ? '&' : '?';
-  redirectTarget = `${rule.target}${separator}${request.querystring}`;
+  const separator = redirectTarget.includes('?') ? '&' : '?';
+  redirectTarget = `${redirectTarget}${separator}${request.querystring}`;
 }
 
 return {

@@ -79,8 +79,54 @@ export type OriginRoutingRule = RoutingRuleBase & {
    * Invalid: 'wp-cluster-alb-123.us-east-2.elb.amazonaws.com/path' (includes path)
    * 
    * Confusing origin and redirect target formats causes 502 (unreachable origin) or redirect loops.
+   * 
+   * If a path suffix is needed, use the optional originPath field.
    */
   target: string;
+
+  /**
+   * Rewrite the request's Host header to match the target hostname.
+   *
+   * Default: false (preserve original Host header).
+   *
+   * When false (default): The Host header from the viewer request is preserved
+   * and forwarded to the origin. This is required for ALB origins that serve
+   * WordPress multisite, which uses Host to select the site.
+   *
+   * When true: The Host header is set to `target` before the request is sent
+   * to the origin. This is required for S3 website endpoints, which use Host
+   * to determine which bucket and content to serve.
+   *
+   * Setting this true with an ALB origin will break multisite Host-based
+   * site selection. Setting this false with an S3 origin will cause S3 to
+   * serve unexpected or wrong content.
+   *
+   * Webrouter equivalent: per-backend overrides in backend_hostheader.map
+   * where the override value is the upstream hostname.
+   */
+  rewriteHostHeader?: boolean;
+
+  /**
+   * Origin path prefix prepended to the request URI when forwarding to origin.
+   *
+   * Default: omitted (no prefix).
+   *
+   * When set: CloudFront's native origin-path mechanism prepends this string
+   * to the request URI. A request for `/admissions` with originPath `/_domains/example.com`
+   * is sent to the origin as `/_domains/example.com/admissions`.
+   *
+   * Use this when the upstream serves multiple "logical hosts" from a single
+   * origin via path namespacing — e.g., S3 buckets that serve multiple
+   * domains from `_domains/<host>/` prefixes.
+   *
+   * Webrouter equivalent: path component on the upstream value in
+   * hosts.map.erb (e.g., `people-protected ist-web-static-sites-prod.bu.edu/_domains/people.bu.edu`).
+   *
+   * Format: must start with `/` and must NOT end with `/`.
+   * Valid: '/_domains/people.bu.edu', '/phpbin/wiki'
+   * Invalid: 'phpbin/wiki' (no leading slash), '/phpbin/wiki/' (trailing slash)
+   */
+  originPath?: string;
 };
 
 /**
@@ -126,6 +172,24 @@ export type RedirectRoutingRule = RoutingRuleBase & {
    * Defaults to false if omitted.
    */
   preserveQuery?: boolean;
+
+  /**
+   * Append the original request URI to the redirect target.
+   *
+   * Default: false (redirect to target as-is).
+   *
+   * When true: The viewer's request URI is appended to the target URL.
+   * Example: request `/parking/permits/staff`, target
+   * `https://www.bu.edu/parking-and-transportation` → Location:
+   * `https://www.bu.edu/parking-and-transportation/permits/staff`
+   *
+   * Combines with preserveQuery: if both are true, request URI is
+   * appended first, then query string.
+   *
+   * Webrouter equivalent: the `redirect` backend (as opposed to
+   * `redirect_asis`).
+   */
+  preservePath?: boolean;
 };
 
 /**

@@ -33,30 +33,44 @@ function applyRoutingRule(
   switch (rule.action) {
     case 'origin':
       // Replace request.origin to route to a different ALB/origin.
-      // Host header is NOT modified - WordPress multisite uses it for site selection.
+      // Host header is NOT modified by default - WordPress multisite uses it for site selection.
       // CloudFront uses domainName for TLS connection (SNI); Host header is application-level.
       request.origin = {
         custom: {
           domainName: rule.target,
           port: 443,
           protocol: 'https',
-          path: '',
+          path: rule.originPath || '',
           sslProtocols: ['TLSv1.2'],
           readTimeout: 60,
           keepaliveTimeout: 5,
           customHeaders: {},  // Empty - auth handler adds challenge/app_authorization to request.headers
         },
       };
+      
+      // Conditionally rewrite Host header for S3 origins
+      if (rule.rewriteHostHeader) {
+        request.headers.host = [{ key: 'Host', value: rule.target }];
+        console.log(`[Routing] Host header rewritten to ${rule.target} (S3 origin pattern)`);
+      }
+      
       console.log(`[Routing] Modified origin to ${rule.target} (action: origin)`);
       return null; // Continue to auth handler
       
     case 'redirect':
-      // Build redirect Location header, optionally preserving query string
+      // Build redirect Location header, optionally preserving path and/or query string
       let redirectTarget = rule.target;
+      
+      // Append original request URI if preservePath is true
+      if (rule.preservePath && request.uri) {
+        redirectTarget = `${rule.target}${request.uri}`;
+      }
+      
+      // Append query string if preserveQuery is true
       if (rule.preserveQuery && request.querystring) {
-        // Append query string to target
-        const separator = rule.target.includes('?') ? '&' : '?';
-        redirectTarget = `${rule.target}${separator}${request.querystring}`;
+        // Append query string to target (check redirectTarget in case path was appended)
+        const separator = redirectTarget.includes('?') ? '&' : '?';
+        redirectTarget = `${redirectTarget}${separator}${request.querystring}`;
       }
       
       // Return redirect response immediately (skip auth)
