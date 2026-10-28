@@ -36,6 +36,7 @@
     "build/"
   ],
   "dependencies": {
+    "@aws-sdk/client-acm": "^3.1158.0",
     "@aws-sdk/client-cloudfront": "^3.1158.0",
     "@aws-sdk/client-elastic-load-balancing-v2": "^3.1158.0",
     "@aws-sdk/client-lambda": "^3.1158.0",
@@ -43,21 +44,24 @@
     "@aws-sdk/client-secrets-manager": "^3.1158.0",
     "@aws-sdk/client-ssm": "^3.1158.0",
     "@aws-sdk/client-sts": "^3.1158.0",
-    "aws-cdk-lib": "^2.275.0",
-    "constructs": "^10.8.1",
     "shibboleth-sp": "https://simple-npm-package-bucket.s3.us-east-1.amazonaws.com/shibboleth-sp/shibboleth-sp-1.1.0.tgz"
+  },
+  "peerDependencies": {
+    "aws-cdk-lib": "^2.223.0",
+    "constructs": "^10.0.0"
   },
   "devDependencies": {
     "@arethetypeswrong/cli": "^0.18.5",
-    "@aws-sdk/client-acm": "^3.1158.0",
     "@aws-sdk/client-cloudwatch-logs": "^3.1158.0",
     "@aws-sdk/client-iam": "^3.1158.0",
     "@jest/globals": "^30.5.2",
     "@types/jest": "^30.0.0",
     "@types/node": "^22.20.5",
     "aws-cdk": "^2.1146.1",
+    "aws-cdk-lib": "^2.275.0",
     "aws-sdk-client-mock": "^4.1.0",
     "aws-sdk-client-mock-jest": "^4.1.0",
+    "constructs": "^10.8.1",
     "esbuild": "^0.28.2",
     "jest": "^30.5.2",
     "jszip": "^3.10.2",

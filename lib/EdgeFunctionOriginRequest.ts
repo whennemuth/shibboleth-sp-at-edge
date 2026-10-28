@@ -3,20 +3,24 @@ import { Effect, PolicyStatement } from "aws-cdk-lib/aws-iam";
 import { Code, Runtime } from "aws-cdk-lib/aws-lambda";
 import { IContext } from "../context/IContext";
 import { Construct } from "constructs";
-import path = require("path");
 import { CloudfrontDistribution } from "./Distribution";
 import { EDGE_REQUEST_ORIGIN_FUNCTION_BASENAME } from "./EdgeFunctionConstants";
+import { stageEdgeFunctionAsset } from "./EdgeContext";
 
 export { EDGE_REQUEST_ORIGIN_FUNCTION_BASENAME };
 
 /**
- * Create policy used by lambda@edge origin request function to access secrets manager.
+ * Create policy used by lambda@edge origin request function to access secrets manager, scoped to
+ * the one secret this deployment is configured to read. Secrets Manager appends a random 6-char
+ * suffix to a secret's real ARN, so a "partial" ARN (without that suffix) gets a wildcard added.
  */
-export const getEdgeFunctionSecretsManagerPolicy = ():PolicyStatement => {
+export const getEdgeFunctionSecretsManagerPolicy = (secretArn: string): PolicyStatement => {
+  const hasRandomSuffix = /-[A-Za-z0-9]{6}$/.test(secretArn);
+  const resource = hasRandomSuffix ? secretArn : `${secretArn}-??????`;
   return new PolicyStatement({
-    actions: [ 'secretsmanager:GetSecretValue', 'secretsmanager:ListSecrets' ],
+    actions: [ 'secretsmanager:GetSecretValue' ],
     effect: Effect.ALLOW,
-    resources: [ '*' ],    
+    resources: [ resource ],    
   });      
 }
 
@@ -43,15 +47,13 @@ export const createEdgeFunctionForOriginRequest = (scope:Construct, context:ICon
   const { STACK_ID, TAGS: { Landscape} } = context;
   const { EDGE_ORIGIN_REQUEST_ID } = CloudfrontDistribution;
 
-  const isInstalled = __dirname.includes('node_modules');
-  const buildPath = isInstalled ? '../../../build' : '../build';
   const edgeFunction = new experimental.EdgeFunction(scope, EDGE_ORIGIN_REQUEST_ID, {
     runtime: Runtime.NODEJS_22_X,
     handler: `${EDGE_ORIGIN_REQUEST_ID}.handler`,
-    code: Code.fromAsset(path.resolve(__dirname, buildPath)),
+    code: Code.fromAsset(stageEdgeFunctionAsset(context, `${EDGE_ORIGIN_REQUEST_ID}.js`)),
     functionName: `${STACK_ID}-${Landscape}-${EDGE_REQUEST_ORIGIN_FUNCTION_BASENAME}`
   });
-  edgeFunction.addToRolePolicy(getEdgeFunctionSecretsManagerPolicy());
+  edgeFunction.addToRolePolicy(getEdgeFunctionSecretsManagerPolicy(context.SHIBBOLETH.secret.secretArn));
   edgeFunction.addToRolePolicy(getEdgeFunctionLoggingPolicy());
 
   callback({

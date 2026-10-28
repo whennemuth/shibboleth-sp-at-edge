@@ -24,13 +24,16 @@ try {
 // shibboleth-sp is aliased to its CommonJS build: its "exports" map would otherwise send an
 // `import` reference (used in FunctionSpOriginRequest.ts) to its ESM build, which calls
 // createRequire(import.meta.url) - undefined once bundled into a CommonJS file.
+// edge-context.json is also external: it doesn't exist at build time (the construct writes it
+// alongside the bundle at synth time, see lib/EdgeContext.ts), and esbuild preserves an external
+// relative require() path verbatim, which still resolves correctly once both land in build/.
 const edgeFunctionBuild = {
   bundle: true,
   platform: 'node',
   format: 'cjs',
   target: 'node22',
   alias: { 'shibboleth-sp': require.resolve('shibboleth-sp') },
-  external: ['@aws-sdk/*'],
+  external: ['@aws-sdk/*', './edge-context.json'],
 };
 
 Promise.all([
@@ -49,7 +52,21 @@ Promise.all([
     entryPoints: ['lib/lambda/FunctionSpViewerResponse.ts'],
     outfile: 'build/edge-viewer-response.js',
   }),
-]).catch((err) => {
+]).then(() => {
+  // Guard against ever re-inlining context: these two bundles (the only ones that read
+  // SHIBBOLETH config) must require() it externally, not carry literal values of their own.
+  for (const file of ['build/edge-viewer-request.js', 'build/edge-origin-request.js']) {
+    const contents = fs.readFileSync(file, 'utf8');
+    if (!contents.includes('require("./edge-context.json")')) {
+      console.error(`${file} does not require("./edge-context.json") - the edge-context external was lost.`);
+      process.exit(1);
+    }
+    if (contents.includes('context/context.json')) {
+      console.error(`${file} still references context/context.json directly - it should import ./EdgeContext instead.`);
+      process.exit(1);
+    }
+  }
+}).catch((err) => {
   console.error(err);
   process.exit(1);
 });
