@@ -1,6 +1,6 @@
 {
   "name": "shibboleth-sp-at-edge",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "description": "Builds a cloudfront-based authentication proxy for shibboleth clients",
   "scripts": {
     "cleanup": "tsx bin/LambdaVersionCleanup.ts",
@@ -17,7 +17,9 @@
     "build": "node bin/build/build.js",
     "typecheck": "tsc --noEmit",
     "prepack": "npm run build",
-    "pack": "npm pack --pack-destination ."
+    "pack": "npm pack --pack-destination .",
+    "publish-s3": "bash bin/publish.sh s3",
+    "publish-npm": "bash bin/publish.sh npm"
   },
   "main": "./dist/cjs/bin/build/index.js",
   "types": "./dist/types/bin/build/index.d.ts",
