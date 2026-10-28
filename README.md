@@ -125,13 +125,13 @@ A more detailed view of the interaction between the end-user, origin request lam
     2. Create the secrets in secrets manager. They will be referenced by the lambda@edge functions. 
         ```
         export AWS_PROFILE=[your profile]
-        npm run create-secrets
+        npm run create-secret
 
         # NOTE: You can override the Landscape tag value by passing a landscape=arg argument:
-        npm run create-secrets landscape=devl
+        npm run create-secret landscape=devl
 
         # Or you can control the secret name entirely by passing a secret_name=arg argument:
-        npm run create-secrets secret_name=shibsp/wp/devl 
+        npm run create-secret secret_name=shibsp/wp/devl 
         ```
 
     3. Replace the placeholder value in `./context/context.json` for the `SHIBBOTH.secret.secretArn` field with the [ARN](https://docs.aws.amazon.com/managedservices/latest/userguide/find-arn.html) of the secret you just created.
@@ -139,7 +139,7 @@ A more detailed view of the interaction between the end-user, origin request lam
     4. [OPTIONAL] If the secrets will be accessed from a different AWS account than the one they were created in, you must attach a resource-based policy to the secret to allow cross-account access. You can do this by running the following command:
 
         ```
-        npm run attach-secret-policy accountId=TARGET_ACCOUNT_ID
+        npm run share-secret accountId=TARGET_ACCOUNT_ID
         ```
 
         Replace `TARGET_ACCOUNT_ID` with the actual AWS account ID that needs access to the secret.
