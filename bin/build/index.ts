@@ -5,12 +5,12 @@ export {
 
 // Context and configuration types
 export { 
-  IContext,
+  type IContext,
   CloudFrontCachingStrategy,
   OriginType,
-  OriginAlb,
-  OriginFunctionUrl,
-  SecretFieldNames 
+  type OriginAlb,
+  type OriginFunctionUrl,
+  type SecretFieldNames 
 } from '../../context/IContext';
 
 // Utility functions that might be useful for consumers
