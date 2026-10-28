@@ -16,3 +16,6 @@ debug.env
 
 RESUME-NEXT.txt
 bin/origin-swap/sample-origin-*
+
+# Working plan/tracking docs - not permanent repo documentation
+*.PLAN.md
