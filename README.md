@@ -36,6 +36,15 @@ The request is processed using the [shibboleth-sp](https://www.npmjs.com/package
   The application that authentication grants access to. In this case a simple lambda function.
   Outside of this simple demo stack, this might be something more conventional, like a container cluster fronted by a load balancer.
 
+### Deployment scenarios
+
+The CloudFront distribution and Lambda@Edge functions are provided by the `ShibbolethAtEdgeConstruct`, configured by an `IContext` object. That construct can be deployed in two ways:
+
+1. **Standalone (loose coordination):** This project is deployed as its own CDK app ([bin/App.ts](./bin/App.ts)). The resulting stack services an application stack that was deployed separately. Configuration comes from this project's [`./context/context.json`](./context/README.md), whose `ORIGIN` section points at the application's ALB or lambda function URL. Omit `ORIGIN` to deploy the demo stack pictured above, with its own dummy origin app.
+2. **Embedded (coupled):** An application project installs this package (see [Packaging/Installing](#packaginginstalling)) and adds the construct to its **own** stack with `ShibbolethAtEdgeConstruct.getInstance()`. It passes its own `IContext` and, typically, the origin it created. This project's `./context/context.json` plays no part.
+
+See [the context doc](./context/README.md) for diagrams, an example of the embedded scenario, and a description of every context field. The **Build Steps** below are written for the standalone scenario. Notes marked *Embedded* explain how a step differs in the embedded scenario.
+
 ### Caching Strategy:
 
 Rather than disabling caching entirely (an obvious but performance-limiting workaround), this implementation uses intelligent cache control:
@@ -68,7 +77,7 @@ A more detailed view of the interaction between the end-user, origin request lam
 
 5. **Access to Target AWS Account**: Ensure you have admin-level access to the target AWS account where you will be deploying the resources. This may involve assuming a specific IAM role *(ie: Shibboleth-InfraMgt/yourself@bu.edu, for the BU CSS account)*.
 
-**Build Steps:**
+**Build Steps (standalone scenario):**
 
 1. Put your AWS profile in the environment:
 
@@ -107,9 +116,9 @@ A more detailed view of the interaction between the end-user, origin request lam
           1. The security group for the ALB must allow only ingress from Cloudfront IP address for the region of the distribution. A [Managed Prefix List](https://aws.amazon.com/blogs/networking-and-content-delivery/limit-access-to-your-origins-using-the-aws-managed-prefix-list-for-amazon-cloudfront/) for cloudfront is applied to the ALB security group as the only ingress rule.
           2. With ingress to the ALB restricted to the cloudfront service, now it must be further restricted to the specific SAML SP distribution. This distribution is configured to add a "secret" header value to each request it forwards to the ALB origin. The ALB is configured with a listener rule that allows through only requests that have this header and that its value matches the expected value. This approach is a standard AWS practice and is detailed here: [Restricting access to Application Load Balancers](https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/restrict-access-to-load-balancer.html)
 
-        - SAML_PK: The private portion of the keypair used to authenticate with shibboleth. This can be in PEM format or just the raw key value. See `"SHIBBOTH.secret.samlCertSecretFld"` in [the context.json doc](./context/README.md) for background on this field.
+        - SAML_PK: The private portion of the keypair used to authenticate with shibboleth. This can be in PEM format or just the raw key value. See `"SHIBBOLETH.secret.samlPrivateKeySecretFld"` in [the context doc](./context/README.md) for background on this field.
 
-        - SAML_CERT: The public certificate portion of the keypair used to authenticate with shibboleth. This must be in PEM format. See `"SHIBBOTH.secret.samlCertSecretFld"` in [the context.json doc](./context/README.md) for background on this field.
+        - SAML_CERT: The public certificate portion of the keypair used to authenticate with shibboleth. This must be in PEM format. See `"SHIBBOLETH.secret.samlCertSecretFld"` in [the context doc](./context/README.md) for background on this field.
         
           ```
           LANDSCAPE="devl2"
@@ -125,21 +134,25 @@ A more detailed view of the interaction between the end-user, origin request lam
     2. Create the secrets in secrets manager. They will be referenced by the lambda@edge functions. 
         ```
         export AWS_PROFILE=[your profile]
-        npm run create-secrets
+        npm run create-secret
 
         # NOTE: You can override the Landscape tag value by passing a landscape=arg argument:
-        npm run create-secrets landscape=devl
+        npm run create-secret landscape=devl
 
         # Or you can control the secret name entirely by passing a secret_name=arg argument:
-        npm run create-secrets secret_name=shibsp/wp/devl 
+        npm run create-secret secret_name=shibsp/wp/devl 
         ```
 
-    3. Replace the placeholder value in `./context/context.json` for the `SHIBBOTH.secret.secretArn` field with the [ARN](https://docs.aws.amazon.com/managedservices/latest/userguide/find-arn.html) of the secret you just created.
+        *Embedded:* these scripts take their defaults (stack ID, landscape, region) from this project's `./context/context.json`. Either run them from a clone of this project with `secret_name=` (and `region=` where accepted) overrides, or call the exported `SecretsManager` class with your application's own `IContext`.
+
+    3. Replace the placeholder value in `./context/context.json` for the `SHIBBOLETH.secret.secretArn` field with the [ARN](https://docs.aws.amazon.com/managedservices/latest/userguide/find-arn.html) of the secret you just created.
+
+        *Embedded:* set `SHIBBOLETH.secret.secretArn` in your application's own `IContext` instead.
 
     4. [OPTIONAL] If the secrets will be accessed from a different AWS account than the one they were created in, you must attach a resource-based policy to the secret to allow cross-account access. You can do this by running the following command:
 
         ```
-        npm run attach-secret-policy accountId=TARGET_ACCOUNT_ID
+        npm run share-secret accountId=TARGET_ACCOUNT_ID
         ```
 
         Replace `TARGET_ACCOUNT_ID` with the actual AWS account ID that needs access to the secret.
@@ -152,12 +165,13 @@ A more detailed view of the interaction between the end-user, origin request lam
 
    > *In general, we recommend against using AWS CloudFormation parameters with the AWS CDK. The usual ways to pass values into AWS CDK apps are [context values](https://docs.aws.amazon.com/cdk/v2/guide/context.html) and environment variables. Because they are not available at synthesis time, parameter values cannot be easily used for flow control and other purposes in your CDK app.*
 
-   **[A Parameters Breakdown](./context/context.md)** is provided to help you understand what each parameter in the context.json file represents and how to set them appropriately for your deployment. 
+   **[A Parameters Breakdown](./context/README.md)** is provided to help you understand what each parameter in the context.json file represents and how to set them appropriately for your deployment. 
    
    Alternatively, if you are deploying for Boston University, you can follow the **[BU Runbook](./docs/bu-runbook.md)**. It will focus you on a minor subset of parameters, and will steer you through a deployment specific to the Boston University environment and WordPress specifics only.
 
+   *Embedded:* skip this step. The same parameters are properties of the `IContext` object your application passes to `ShibbolethAtEdgeConstruct.getInstance()`.
 
-7. [OPTIONAL] Run the [CDK synth command](https://docs.aws.amazon.com/cdk/v2/guide/cli.html#cli-synth) command to generate the cloudformation template that will be used to create the stack:
+8. [OPTIONAL] Run the [CDK synth command](https://docs.aws.amazon.com/cdk/v2/guide/cli.html#cli-synth) command to generate the cloudformation template that will be used to create the stack:
 
    ```
    mkdir ./cdk.out 2> /dev/null
@@ -166,7 +180,7 @@ A more detailed view of the interaction between the end-user, origin request lam
 
    *NOTE: The synth command will create a .json file, but will also output yaml to stdout. The command above redirects that output to a ./cdk.out/synth.output.yaml.*
    
-8. Deploy the stack from scratch with the [CDK deploy command](https://docs.aws.amazon.com/cdk/v2/guide/cli.html#cli-deploy):
+9. Deploy the stack from scratch with the [CDK deploy command](https://docs.aws.amazon.com/cdk/v2/guide/cli.html#cli-deploy):
 
    ```
    cdk deploy
@@ -177,6 +191,8 @@ A more detailed view of the interaction between the end-user, origin request lam
    ```
    npm run deploy
    ```
+
+   *Embedded:* steps 8 and 9 are done from your application project, which synthesizes and deploys the construct as part of its own stack.
 
 **Teardown:**
 
@@ -199,6 +215,8 @@ A more detailed view of the interaction between the end-user, origin request lam
   ```
   npm run cleanup dryrun
   ```
+
+  *Embedded:* `npm run cleanup` identifies the distribution from this project's `./context/context.json` (`TAGS.Landscape`), so it only applies to an embedded deployment if that file is set to the same landscape and region.
 
 **Rebuild:**
 

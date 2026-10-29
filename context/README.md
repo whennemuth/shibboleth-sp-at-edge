@@ -1,8 +1,73 @@
 ## Configuration Context
 
-CDK stack deployment imports a [Runtime Context](https://docs.aws.amazon.com/cdk/v2/guide/context.html) for configuration details.
-This context is configured in a context.json file and the content of this file is cast to a type found in IContext.ts.
-Every time this app is deployed, the exact state of the context.json file is stored in SSM Parameter Store for reference.
+The `ShibbolethAtEdgeConstruct` is configured by a [Runtime Context](https://docs.aws.amazon.com/cdk/v2/guide/context.html) object of type `IContext` (see [IContext.ts](./IContext.ts)).
+*Where* that object comes from depends on which of two deployment scenarios applies:
+
+### Scenario 1: Standalone (loose coordination)
+
+This project is deployed as its own CDK app ([bin/App.ts](../bin/App.ts)), producing its own stack ("stack B") that services an application stack ("stack A") deployed separately, beforehand.
+
+- The context is read from **this project's** `./context/context.json` file.
+- The `ORIGIN` section of that file points at stack A's origin: either an ALB (`originType: "alb"` + `dnsName`) or a lambda function URL (`originType: "function-url"` + `url`).
+- If `ORIGIN` is omitted, or is a `function-url` without a `url`, a "dummy" lambda app is deployed as the origin instead (the **Demo** mode described [below](#overview)).
+- The `npm run create-secret` / `share-secret` / `cleanup` / `get-stack-name` scripts also read their defaults from this file.
+
+```mermaid
+flowchart TB
+  subgraph repoA["Application project"]
+    A["Stack A<br/>(application)"] --> O["Origin<br/>ALB or function URL"]
+  end
+  subgraph repoB["This project"]
+    C["context/context.json<br/>ORIGIN → stack A's origin"] --> App["bin/App.ts"]
+    App --> B["Stack B<br/>ShibbolethAtEdgeConstruct.createStack()"]
+    B --> CF["CloudFront + Lambda@Edge"]
+  end
+  CF -- "forwards authenticated requests" --> O
+```
+
+### Scenario 2: Embedded (coupled)
+
+An application project installs this package and adds the `ShibbolethAtEdgeConstruct` to its **own** stack, alongside the origin that stack creates. Only one stack (plus the us-east-1 support stack CDK creates for Lambda@Edge, as in scenario 1) is involved.
+
+- The application supplies its own `IContext` object. **This project's `./context/context.json` is irrelevant.**
+- The application usually also passes `httpOriginBase`, the CloudFront origin it already built, so the construct doesn't build one from `ORIGIN`. Even so, `ORIGIN` should still describe that origin, because `ORIGIN.subdomain` (custom DNS) and `ORIGIN.appAuthorization` (edge-function behavior) are still read from it.
+- At synth time, the construct writes the `SHIBBOLETH`, `APP_LOGIN_HEADER`/`APP_LOGOUT_HEADER` and `ORIGIN.appAuthorization` values from that object into an `edge-context.json` file deployed alongside each Lambda@Edge function. So the application's own Shibboleth settings take effect at runtime.
+
+For example, an application stack that serves its app from a lambda function URL might do:
+
+```typescript
+import { ShibbolethAtEdgeConstruct, OriginType } from 'shibboleth-sp-at-edge';
+
+// AuthenticatedContext is the application's own type, compatible with IContext.
+// The Shibboleth construct fronts the function URL, so it needs the URL in its context.
+const shibContext: AuthenticatedContext = { ...context, ORIGIN: applicationStack.modifiedContextOrigin };
+await ShibbolethAtEdgeConstruct.getInstance({
+  scope: applicationStack,
+  id: 'shibboleth-sp-at-edge',
+  context: shibContext,
+  httpOriginBase: {
+    originType: OriginType.FUNCTION_URL,
+    httpOrigin: applicationStack.functionOrigin
+  }
+});
+```
+
+```mermaid
+flowchart LR
+  subgraph repoA["Application project"]
+    C["application's own IContext"] --> A["Application stack"]
+    A --> O["Origin<br/>ALB or function URL"]
+    A --> S["ShibbolethAtEdgeConstruct.getInstance()<br/>(httpOriginBase → origin)"]
+    S --> CF["CloudFront + Lambda@Edge<br/>(edge-context.json from the application's IContext)"]
+    CF -- "forwards authenticated requests" --> O
+  end
+  P[["npm package:<br/>shibboleth-sp-at-edge"]] -. "installed into" .-> repoA
+```
+
+### The rest of this document
+
+The fields described below apply to **both** scenarios. In scenario 1 they are the keys of `./context/context.json`. In scenario 2 they are the properties of the `IContext` object the application passes in.
+
 In order to create IContext.ts or modify it to reflect changes to `./context/context.json` run the following:
 
 ```
@@ -10,16 +75,16 @@ cd context/
 quicktype context.json -o IContext.ts
 ```
 
-***NOTE**: After deployment, the ContextLog construct automatically stores a copy of the context.json file used for the deployment in an S3 bucket. This allows you to retrieve the exact configuration that was used to create or update your stack, which is useful for auditing, troubleshooting, or reproducing deployments. The bucket name follows the pattern `{stack-name}-context-config-{account-id}-{region}` and contains the context file at the root level.*
+***NOTE**: After deployment, the ContextLog construct automatically stores a copy of the context used for the deployment in an S3 bucket (in either scenario). This allows you to retrieve the exact configuration that was used to create or update your stack, which is useful for auditing, troubleshooting, or reproducing deployments. The bucket name follows the pattern `{stack-name}-context-config-{account-id}-{region}` and contains the context file at the root level.*
 
 #### Overview:
 
-This stack can be configured against two modes:
+In scenario 2, the origin is whatever the application passes as `httpOriginBase`, so the modes below matter mainly for scenario 1. In that scenario the stack can be configured in one of two modes:
 
-1. **Standard**: This mode sets up a [cloudfront distribution](https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/distribution-overview.html) and a [cloudfront lambda@edge origin request function](https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/lambda-at-the-edge.html).
-   You indicate this mode by setting the `ORIGIN.OriginType` value to `"alb"` in `./context/context.json`. It is assumed that your origin application is serviced by a [application load balancer](https://docs.aws.amazon.com/elasticloadbalancing/latest/application/introduction.html) and providing its [arn](https://docs.aws.amazon.com/IAM/latest/UserGuide/reference-arns.html) and [dns name](https://docs.aws.amazon.com/elasticloadbalancing/latest/userguide/how-elastic-load-balancing-works.html#request-routing) is enough to "point" the cloudfront distribution at it as an origin.
+1. **Standard**: This mode sets up a [cloudfront distribution](https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/distribution-overview.html) and a [cloudfront lambda@edge origin request function](https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/lambda-at-the-edge.html), targeting an existing origin.
+   You indicate this mode by setting the `ORIGIN.originType` value to `"alb"` in `./context/context.json`. Alternatively, set it to `"function-url"` and provide `ORIGIN.url` to target an existing lambda function URL. For an ALB, it is assumed that your origin application is serviced by a [application load balancer](https://docs.aws.amazon.com/elasticloadbalancing/latest/application/introduction.html) and providing its [arn](https://docs.aws.amazon.com/IAM/latest/UserGuide/reference-arns.html) and [dns name](https://docs.aws.amazon.com/elasticloadbalancing/latest/userguide/how-elastic-load-balancing-works.html#request-routing) is enough to "point" the cloudfront distribution at it as an origin.
 2. **Demo:** This mode sets up the cloudfront distribution, lambda@edge origin request function, a "dummy" [lambda function](https://docs.aws.amazon.com/lambda/latest/dg/welcome.html), and a [function url](https://docs.aws.amazon.com/lambda/latest/dg/lambda-urls.html).
-   You indicate this mode by setting the `ORIGIN.OriginType` value to `"function-url"` in `./context/context.json` *(or omitting the `ORIGIN` property altogether)*.
+   You indicate this mode by setting the `ORIGIN.originType` value to `"function-url"` without a `url` in `./context/context.json` *(or omitting the `ORIGIN` property altogether)*.
    The intent of this mode is to deploy to AWS all of the Shibboleth SP functionality in cloudfront AND an origin "application" for it to target. The simplest and most lightweight option for this is another lambda function. This follows AWS directions on ["Using a Lambda function URL"](https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/DownloadDistS3AndCustomOrigins.html#concept_lambda_function_url)
 
 #### Context fields:
@@ -28,7 +93,9 @@ This stack can be configured against two modes:
 - ACCOUNT: The ID of the aws account you are deploying to.
 - REGION: The region you are deploying to.
 - ORIGIN: Configurations that pertain to the [application load balancer](https://docs.aws.amazon.com/elasticloadbalancing/latest/application/introduction.html) you want to target as the origin for cloudfront. *SEE: ["Using an application load balancer"](https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/DownloadDistS3AndCustomOrigins.html#concept_elb_origin) and ["Restricting access to Application Load Balancers"](https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/restrict-access-to-load-balancer.html)*
-  - dnsName: The [dns name](https://docs.aws.amazon.com/elasticloadbalancing/latest/userguide/how-elastic-load-balancing-works.html#request-routing) of the ALB targeted as the origin.
+  - originType: `"alb"` or `"function-url"`.
+  - url: *(function-url only)* The URL of an existing lambda function URL to target. Omit it to get the Demo mode's dummy app.
+  - dnsName: *(alb only)* The [dns name](https://docs.aws.amazon.com/elasticloadbalancing/latest/userguide/how-elastic-load-balancing-works.html#request-routing) of the ALB targeted as the origin.
   - stackId: Indicates a unique identifier for the cloudfront origin that the lambda@edge functions intercept traffic for. This value will form part of the name of the secrets manager secret created for this stack and thereby provide a clue as to the origin the secrets are applicable to.
   - arn: The [Amazon resource name](https://docs.aws.amazon.com/IAM/latest/UserGuide/reference-arns.html) of the ALB,
   - subdomain: If the cloudfront distribution through which requests are to pass to reach the origin is to be associated with custom DNS using Route53 and a Certificate, this value specifies a subdomain of that hosted zone. For example, if the hosted zone is `mydomain.com`, the this value would be something like `mysubdomain.mydomain.com`

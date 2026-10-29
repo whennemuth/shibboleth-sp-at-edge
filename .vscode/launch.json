@@ -5,7 +5,7 @@
       "request": "launch",
       "name": "CDK Debugger (App)",
       "skipFiles": ["<node_internals>/**"],
-      "runtimeArgs": ["-r", "${workspaceFolder}/node_modules/ts-node/register/transpile-only"],
+      "runtimeArgs": ["--import", "tsx"],
       "args": ["${workspaceFolder}/bin/App.ts"],
       "envFile": "${workspaceFolder}/debug.env"
     },
@@ -17,7 +17,7 @@
         "<node_internals>/**"
       ],
       "runtimeArgs": [
-        "-r", "./node_modules/ts-node/register/transpile-only"
+        "--import", "tsx"
       ],
       "args": [
         "${workspaceFolder}/bin/LambdaVersionCleanup.ts",
@@ -64,7 +64,7 @@
       "request": "launch",
       "name": "Debug current file",
       "skipFiles": [ "<node_internals>/**" ],
-      "runtimeArgs": ["-r", "${workspaceFolder}/node_modules/ts-node/register/transpile-only"],
+      "runtimeArgs": ["--import", "tsx"],
       "args": [ "${file}" ], 
       "env": {
         "AWS_REGION": "us-east-2"

@@ -118,7 +118,13 @@ const context: IContext = {
 - **Flexible Origins**: Support for ALB, Function URLs, and other origin types
 - **Route53 Integration**: Automatic DNS management
 - **Secrets Management**: Secure handling of SP certificates and keys
-- **Dual Module Support**: Works with both CommonJS and ESM projects
+
+## Module Format
+
+This package is published as **CommonJS only** - there is no ESM build. Two reasons:
+
+- The construct locates its prebuilt Lambda@Edge bundles relative to its own install location on disk (`path.resolve(__dirname, '../../../build')`), which relies on CommonJS's `__dirname`.
+- Every known consumer is a CommonJS CDK app (including this repo's own `bin/App.ts`), and CommonJS can't synchronously `require()` a pure-ESM package - it would have to switch to `await import(...)` just to load the construct. Staying CommonJS costs nothing in return: ESM projects can still `import` this package via Node's built-in CJS/ESM interop.
 
 ## API Reference
 

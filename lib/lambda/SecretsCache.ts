@@ -1,9 +1,8 @@
 import { GetSecretValueCommand, GetSecretValueCommandOutput, SecretsManagerClient } from "@aws-sdk/client-secrets-manager";
-import * as context from '../../context/context.json';
-import { Secret } from '../../context/IContext';
+import { edgeContext } from './EdgeContext';
 import { CLOUDFRONT_CHALLENGE_HEADER_NAME } from "../secrets/Secret";
 
-const { secretArn, refreshInterval, samlCertSecretFld, samlPrivateKeySecretFld, jwtPublicKeySecretFld, jwtPrivateKeySecretFld } = context.SHIBBOLETH.secret as Secret;
+const { secretArn, refreshInterval, samlCertSecretFld, samlPrivateKeySecretFld, jwtPublicKeySecretFld, jwtPrivateKeySecretFld } = edgeContext.SHIBBOLETH.secret;
 const refreshIntervalInt = parseInt(refreshInterval)
 
 export type CachedKeys = {

@@ -1,15 +1,13 @@
 import { IConfig, IRequest, IResponse, SamlParms, handler as spHandler } from 'shibboleth-sp';
-import { IContext, Shibboleth } from '../../context/IContext';
-import * as contextJSON from '../../context/context.json';
+import { edgeContext } from './EdgeContext';
 import { instanceOf } from '../Util';
 import { CLOUDFRONT_CHALLENGE_HEADER_NAME } from '../secrets/Secret';
 import { VIEWER_DOMAIN_HEADER_NAME } from './FunctionSpViewerRequest';
 import { LambdaEdgeOriginRequestEvent } from './OriginRequestEventType';
 import { CachedKeys, checkCache } from './SecretsCache';
 
-const context = contextJSON as IContext;
-const { APP_LOGIN_HEADER, APP_LOGOUT_HEADER, SHIBBOLETH, ORIGIN: { appAuthorization = true } = {} } = context;
-const { entityId, entryPoint, logoutUrl, idpCert } = SHIBBOLETH as Shibboleth;
+const { APP_LOGIN_HEADER, APP_LOGOUT_HEADER, SHIBBOLETH, appAuthorization } = edgeContext;
+const { entityId, entryPoint, logoutUrl, idpCert } = SHIBBOLETH;
 
 const cachedKeys:CachedKeys = { 
   _timestamp: 0, /* One hour */ 

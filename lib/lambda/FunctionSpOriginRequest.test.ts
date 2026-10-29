@@ -3,6 +3,25 @@ import { jest } from '@jest/globals';
 // Mock shibboleth-sp BEFORE any imports that use it
 jest.mock('shibboleth-sp');
 
+// Mock the synth-time-generated edge context (the real module require()s a json file that only
+// exists once the construct stages it alongside a built bundle - see lib/EdgeContext.ts).
+jest.mock('./EdgeContext', () => ({
+  edgeContext: {
+    APP_LOGIN_HEADER: 'test-login-header',
+    APP_LOGOUT_HEADER: 'test-logout-header',
+    appAuthorization: true,
+    SHIBBOLETH: {
+      entityId: 'test-entity', entryPoint: 'test-entry', logoutUrl: 'test-logout', idpCert: 'test-cert',
+      secret: {
+        secretArn: 'arn:aws:secretsmanager:us-east-1:123456789012:secret:test-aBcDeF',
+        refreshInterval: '3600000',
+        samlPrivateKeySecretFld: 'saml-pk', samlCertSecretFld: 'saml-cert',
+        jwtPrivateKeySecretFld: 'jwt-pk', jwtPublicKeySecretFld: 'jwt-pub'
+      }
+    }
+  }
+}));
+
 import { IConfig, IRequest, IResponse } from 'shibboleth-sp';
 import { handler } from './FunctionSpOriginRequest';
 import { CachedKeys } from './SecretsCache';
