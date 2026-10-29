@@ -55,6 +55,7 @@ await ShibbolethAtEdgeConstruct.getInstance({
 ```mermaid
 flowchart LR
   subgraph repoA["Application project"]
+    direction TB
     C["application's own IContext"] --> A["Application stack"]
     A --> O["Origin<br/>ALB or function URL"]
     A --> S["ShibbolethAtEdgeConstruct.getInstance()<br/>(httpOriginBase → origin)"]
