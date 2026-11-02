@@ -49,6 +49,17 @@ export interface Shibboleth {
     entryPoint: string;
     logoutUrl:  string;
     secret:     Secret;
+    /**
+     * Optional name for the jwt cookie (default "auth-token-cookie"). Give distributions that share a sign-in
+     * one name, and any distribution that must keep its own sign-in a different one.
+     */
+    cookieName?:   string;
+    /**
+     * Optional parent domain for the jwt cookie, so one sign-in is honored by every distribution beneath it
+     * that shares the jwt keys and cookieName. Requires ORIGIN.subdomain, which it must contain. Default: none
+     * (a host-only cookie).
+     */
+    cookieDomain?: string;
 }
 
 export interface SecretFieldNames {

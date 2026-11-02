@@ -17,7 +17,8 @@ jest.mock('./EdgeContext', () => ({
         refreshInterval: '3600000',
         samlPrivateKeySecretFld: 'saml-pk', samlCertSecretFld: 'saml-cert',
         jwtPrivateKeySecretFld: 'jwt-pk', jwtPublicKeySecretFld: 'jwt-pub'
-      }
+      },
+      cookieName: 'test-cookie', cookieDomain: 'warhen.work'
     }
   }
 }));
@@ -73,10 +74,12 @@ jest.mock('../secrets/Secret', () => {
 const apples = [ { key: 'apples', value: 'macintosh' } ];
 const oranges = [ { key: 'oranges', value: 'navel' } ];
 const pears = [ { key: 'pears', value: 'bosc' } ];
+let mockLastConfig: IConfig | undefined;
 jest.mock('shibboleth-sp', () => {
   return {
     __esModule: true,
     handler: async (request:IRequest, config:IConfig) => {
+      mockLastConfig = config;
       const { querystring } = request;
       switch(querystring) {
         case SP_RETVAL_TYPE.request:
@@ -167,5 +170,11 @@ describe('FunctionSpOriginRequest.handler', () => {
     let retval = await handler(event as unknown as LambdaEdgeOriginRequestEvent);
 
     expect(instanceOf<IRequest>(retval, "uri")).toBeFalsy();
+  });
+
+  it('Should pass the edge context\'s cookie name and domain to the sp handler', async () => {
+    mockLastConfig = undefined;
+    await handler(getEssentialEvent(SP_RETVAL_TYPE.response) as unknown as LambdaEdgeOriginRequestEvent);
+    expect(mockLastConfig).toMatchObject({ cookieName: 'test-cookie', cookieDomain: 'warhen.work' });
   });
 });

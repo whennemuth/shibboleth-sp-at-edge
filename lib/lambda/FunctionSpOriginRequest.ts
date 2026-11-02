@@ -7,7 +7,7 @@ import { LambdaEdgeOriginRequestEvent } from './OriginRequestEventType';
 import { CachedKeys, checkCache } from './SecretsCache';
 
 const { APP_LOGIN_HEADER, APP_LOGOUT_HEADER, SHIBBOLETH, appAuthorization } = edgeContext;
-const { entityId, entryPoint, logoutUrl, idpCert } = SHIBBOLETH;
+const { entityId, entryPoint, logoutUrl, idpCert, cookieName, cookieDomain } = SHIBBOLETH;
 
 const cachedKeys:CachedKeys = { 
   _timestamp: 0, /* One hour */ 
@@ -105,7 +105,9 @@ export const handler =  async (event:LambdaEdgeOriginRequestEvent) => {
       { key: CLOUDFRONT_CHALLENGE_HEADER_NAME, value: cloudfrontChallenge }
     ],
     jwtPrivateKeyPEM: jwtPrivateKey,
-    jwtPublicKeyPEM: jwtPublicKey
+    jwtPublicKeyPEM: jwtPublicKey,
+    cookieName,
+    cookieDomain
   } as IConfig
 
   // Call the sp handler.

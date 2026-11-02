@@ -45,6 +45,10 @@ The CloudFront distribution and Lambda@Edge functions are provided by the `Shibb
 
 See [the context doc](./context/README.md) for diagrams, an example of the embedded scenario, and a description of every context field. The **Build Steps** below are written for the standalone scenario. Notes marked *Embedded* explain how a step differs in the embedded scenario.
 
+### Sharing one sign-in across distributions
+
+By default each distribution has its own sign-in: the JWT cookie is set for its hostname only. When several distributions live under one parent domain *(for example one per environment at `<env>.apps.example.edu`)*, the optional `SHIBBOLETH.cookieDomain` and `SHIBBOLETH.cookieName` context fields let one sign-in serve all of them for the JWT's lifetime, while any distribution that should keep its own sign-in opts out with a different cookie name and its own JWT keys. See [Sharing one sign-in across distributions](./context/README.md#sharing-one-sign-in-across-distributions) in the context doc.
+
 ### Caching Strategy:
 
 Rather than disabling caching entirely (an obvious but performance-limiting workaround), this implementation uses intelligent cache control:
@@ -244,6 +248,10 @@ Deeper dives into unit testing and logging:
 
 ## Packaging/Installing
 See [USAGE.md](./bin/build/USAGE.md) for packaging and usage instructions.
+
+## Release notes
+
+- **2.1.0** - Adds the optional `SHIBBOLETH.cookieName` and `SHIBBOLETH.cookieDomain` context fields for sharing one sign-in across distributions (see [Sharing one sign-in across distributions](./context/README.md#sharing-one-sign-in-across-distributions)). They reach the edge functions through `edge-context.json`, and synth fails for a `cookieDomain` without `ORIGIN.subdomain`, one that doesn't contain it, or a value that isn't valid in a cookie. The demo app reads the cookie by the configured name. Requires shibboleth-sp 1.3.0. With neither field set, behavior is unchanged.
 
 ## References
 

@@ -1,0 +1,14 @@
+{
+  // Type-checking for the jest tests, which sit beside the source in lib/ and which the root tsconfig.json excludes
+  // from the build. Without a tsconfig that includes them, editors check them with TypeScript's defaults, and
+  // TypeScript 6 no longer loads @types packages automatically, so jest's globals (describe, it, expect) go missing.
+  // The build (bin/build/build.js) and ts-jest both use the root tsconfig.json, so this file affects only editors
+  // and `npx tsc -p lib`.
+  "extends": "../tsconfig.json",
+  "compilerOptions": {
+    "types": [ "node", "jest" ],
+    "noEmit": true
+  },
+  "include": [ "." ],
+  "exclude": []
+}

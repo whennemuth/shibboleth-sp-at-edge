@@ -127,6 +127,30 @@ In scenario 2, the origin is whatever the application passes as `httpOriginBase`
     - samlPrivateKeySecretFld: This is the private key that matches the samlCertSecretFld certificate.
     - jwtPublicKeySecretFld: This is the public portion of a RSA keypair. It is used in signing the [JSON web token (JWT)](https://jwt.io/introduction) by the Lambda@edge origin request function. [Example for generating this key](https://www.npmjs.com/package/node-forge#rsa)
     - jwtPrivateKeySecretFld: This is the private counterpart of jwtPublicKeySecretFld
+  - cookieName: *(optional)* The name of the cookie that carries the JWT. Default: `auth-token-cookie`. See [Sharing one sign-in across distributions](#sharing-one-sign-in-across-distributions) below.
+  - cookieDomain: *(optional)* A parent domain to scope the JWT cookie to, so that the browser sends it to every host beneath that domain instead of only the distribution's own hostname. Requires `ORIGIN.subdomain`, which it must contain. Default: none *(a host-only cookie)*. See [Sharing one sign-in across distributions](#sharing-one-sign-in-across-distributions) below.
+
+#### Sharing one sign-in across distributions:
+
+**The default: one sign-in per distribution.** Each distribution sets its JWT cookie for its own hostname only (`ORIGIN.subdomain`). An organization that deploys this construct several times under one parent domain - for example one distribution per environment at `dev.apps.example.edu`, `test.apps.example.edu` and `prod.apps.example.edu` - gets a separate sign-in at each. Moving to another distribution still works without a password prompt while the user's session at the IDP lasts, because each distribution's login request reuses that session, but every distribution makes its own round trip to the IDP. Once the IDP session ends *(typically hours, set by the IDP's operators)*, the next distribution the user visits prompts for a password again, even though the JWT at the one they signed in at is good for days.
+
+**Sharing the sign-in.** Setting `SHIBBOLETH.cookieDomain` to the parent domain *(`apps.example.edu` above)* scopes the cookie to it, so one sign-in at any of the distributions is honored by all of them for the JWT's full lifetime *(7 days)*, with no further trips to the IDP. Every distribution that shares the sign-in needs:
+
+- the same `cookieDomain`,
+- the same `cookieName`, and
+- the same JWT key pair: a `secret` whose `jwtPrivateKeySecretFld` / `jwtPublicKeySecretFld` hold the same keys, most simply the same `secretArn`. Each distribution verifies tokens with its own copy of the public key, so it can only accept a token signed with the matching private key.
+
+The SAML settings (`entityId`, `idpCert`, the SAML key and certificate) are unaffected: each distribution still signs in with the IDP the same way.
+
+Synth fails if `cookieDomain` is set without `ORIGIN.subdomain`, or doesn't contain it *(a browser drops a cookie whose domain doesn't contain the host that sets it, and the edge functions would fail every request)*, or if either value isn't valid in a cookie. Choose a domain that contains only hosts you trust with the token: the browser sends the cookie to *every* host beneath it, including ones run by other applications.
+
+**Keeping one distribution out.** A distribution beneath the shared domain receives the shared cookie whether or not it takes part. To keep its own sign-in, give it a different `cookieName` (or leave the default while the shared ones use another name), so it reads only its own cookie. To make sure it never accepts the shared sign-in, also give it its own JWT key pair in its own secret: a different name only stops the browser from presenting the shared token, while a different key pair stops the distribution from accepting it.
+
+**Logout.** Logging out at a distribution that shares the sign-in signs the browser out of all of them, since it clears the shared cookie; logging out at one with a host-only cookie signs out of that one only. Logout never revokes a JWT already issued.
+
+**An origin that reads the cookie itself.** An origin application that decodes the JWT cookie, rather than using the `user-details` header the edge functions add, must look it up by the configured name. The demo mode's dummy app does this.
+
+The [shibboleth-sp README](https://www.npmjs.com/package/shibboleth-sp) covers the same settings at the library level.
 
 #### Example:
 

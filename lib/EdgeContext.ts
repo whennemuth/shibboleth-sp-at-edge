@@ -1,6 +1,7 @@
 import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
+import { JwtTools, hostIsWithinCookieDomain } from 'shibboleth-sp';
 import { IContext } from '../context/IContext';
 import type { EdgeContext } from './lambda/EdgeContext';
 
@@ -10,7 +11,7 @@ import type { EdgeContext } from './lambda/EdgeContext';
  */
 export const toEdgeContext = (context: IContext): EdgeContext => {
   const { APP_LOGIN_HEADER, APP_LOGOUT_HEADER, SHIBBOLETH, ORIGIN } = context;
-  const { entityId, entryPoint, logoutUrl, idpCert, secret } = SHIBBOLETH || ({} as typeof SHIBBOLETH);
+  const { entityId, entryPoint, logoutUrl, idpCert, secret, cookieName, cookieDomain } = SHIBBOLETH || ({} as typeof SHIBBOLETH);
   const {
     secretArn, refreshInterval, samlPrivateKeySecretFld, samlCertSecretFld,
     jwtPrivateKeySecretFld, jwtPublicKeySecretFld
@@ -28,6 +29,8 @@ export const toEdgeContext = (context: IContext): EdgeContext => {
     );
   }
 
+  validateCookieSettings(cookieName, cookieDomain, ORIGIN?.subdomain);
+
   return {
     APP_LOGIN_HEADER: APP_LOGIN_HEADER!,
     APP_LOGOUT_HEADER: APP_LOGOUT_HEADER!,
@@ -38,9 +41,37 @@ export const toEdgeContext = (context: IContext): EdgeContext => {
         secretArn: secretArn!, refreshInterval: refreshInterval!,
         samlPrivateKeySecretFld: samlPrivateKeySecretFld!, samlCertSecretFld: samlCertSecretFld!,
         jwtPrivateKeySecretFld: jwtPrivateKeySecretFld!, jwtPublicKeySecretFld: jwtPublicKeySecretFld!
-      }
+      },
+      ...(cookieName ? { cookieName } : {}),
+      ...(cookieDomain ? { cookieDomain } : {})
     }
   };
+};
+
+/**
+ * The edge functions would reject these settings on every request (shibboleth-sp fails a request whose host
+ * the cookie domain doesn't contain, and JwtTools rejects a malformed name or domain), so fail synth instead.
+ */
+const validateCookieSettings = (cookieName?: string, cookieDomain?: string, subdomain?: string): void => {
+  try {
+    new JwtTools({ cookieName, cookieDomain });
+  }
+  catch (e: any) {
+    throw new Error(`Cannot build the Lambda@Edge context: SHIBBOLETH: ${e.message}.`);
+  }
+  if ( ! cookieDomain) return;
+  if ( ! subdomain) {
+    throw new Error(
+      `Cannot build the Lambda@Edge context: SHIBBOLETH.cookieDomain "${cookieDomain}" requires ORIGIN.subdomain ` +
+      `(the distribution's own cloudfront.net hostname can't share a cookie domain).`
+    );
+  }
+  if ( ! hostIsWithinCookieDomain(subdomain, cookieDomain)) {
+    throw new Error(
+      `Cannot build the Lambda@Edge context: SHIBBOLETH.cookieDomain "${cookieDomain}" does not contain ` +
+      `ORIGIN.subdomain "${subdomain}".`
+    );
+  }
 };
 
 /**

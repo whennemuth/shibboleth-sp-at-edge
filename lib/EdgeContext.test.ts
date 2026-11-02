@@ -4,6 +4,9 @@ import * as path from 'path';
 import { IContext } from '../context/IContext';
 import { toEdgeContext, stageEdgeFunctionAsset } from './EdgeContext';
 
+// jest.config.js maps shibboleth-sp to a manual mock; the cookie validation tested here needs the real package.
+jest.mock('shibboleth-sp', () => jest.requireActual('../node_modules/shibboleth-sp'));
+
 const getValidContext = (): IContext => ({
   STACK_ID: 'test-stack',
   ACCOUNT: '123456789012',
@@ -72,6 +75,43 @@ describe('toEdgeContext', () => {
     expect(() => toEdgeContext(context)).toThrow(/APP_LOGIN_HEADER/);
     expect(() => toEdgeContext(context)).toThrow(/entityId/);
     expect(() => toEdgeContext(context)).toThrow(/secretArn/);
+  });
+
+  it('leaves the cookie settings out when they are not set', () => {
+    const { SHIBBOLETH } = toEdgeContext(getValidContext());
+    expect('cookieName' in SHIBBOLETH).toBe(false);
+    expect('cookieDomain' in SHIBBOLETH).toBe(false);
+  });
+
+  it('copies cookieName and cookieDomain when set', () => {
+    const context = getValidContext();
+    context.ORIGIN!.subdomain = 'app1.apps.example.edu';
+    context.SHIBBOLETH.cookieName = 'apps-auth';
+    context.SHIBBOLETH.cookieDomain = 'apps.example.edu';
+    expect(toEdgeContext(context).SHIBBOLETH).toMatchObject({ cookieName: 'apps-auth', cookieDomain: 'apps.example.edu' });
+
+    // A name alone is allowed: it keeps a host-only cookie apart from a shared one.
+    delete context.SHIBBOLETH.cookieDomain;
+    const { SHIBBOLETH } = toEdgeContext(context);
+    expect(SHIBBOLETH.cookieName).toEqual('apps-auth');
+    expect('cookieDomain' in SHIBBOLETH).toBe(false);
+  });
+
+  it('fails synth for cookie settings the edge functions would reject on every request', () => {
+    const context = getValidContext();
+    context.SHIBBOLETH.cookieDomain = 'apps.example.edu';
+    expect(() => toEdgeContext(context)).toThrow(/requires ORIGIN.subdomain/);
+
+    context.ORIGIN!.subdomain = 'app1.other.example.edu';
+    expect(() => toEdgeContext(context)).toThrow(/"apps.example.edu" does not contain ORIGIN.subdomain "app1.other.example.edu"/);
+
+    context.ORIGIN!.subdomain = 'app1.apps.example.edu';
+    context.SHIBBOLETH.cookieName = 'bad name';
+    expect(() => toEdgeContext(context)).toThrow(/Invalid cookie name/);
+
+    context.SHIBBOLETH.cookieName = 'apps-auth';
+    context.SHIBBOLETH.cookieDomain = 'apps.example.edu; Path=/x';
+    expect(() => toEdgeContext(context)).toThrow(/Invalid cookie domain/);
   });
 });
 
