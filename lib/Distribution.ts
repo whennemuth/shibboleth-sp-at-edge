@@ -6,6 +6,7 @@ import { Bucket, ObjectOwnership } from 'aws-cdk-lib/aws-s3';
 import { Construct } from 'constructs';
 import { AUTH_PATHS } from 'shibboleth-sp';
 import { CloudFrontCachingStrategy, IContext, Origin, OriginAlb, OriginFunctionUrl, OriginType } from '../context/IContext';
+import { distributionComment } from './EdgeFunctionConstants';
 import { createEdgeFunctionForOriginRequest } from './EdgeFunctionOriginRequest';
 import { createEdgeFunctionForViewerRequest } from './EdgeFunctionViewerRequest';
 import { createEdgeFunctionForViewerResponse } from './EdgeFunctionViewerResponse';
@@ -308,7 +309,7 @@ export class CloudfrontDistribution extends Construct {
         autoDeleteObjects: true,
         objectOwnership: ObjectOwnership.OBJECT_WRITER
       }),
-      comment: `shib-lambda-${TAGS.Landscape}-distribution`,  
+      comment: distributionComment(TAGS.Landscape),
       domainNames: subdomains, 
       defaultBehavior: getDefaultBehavior(),
     } as DistributionProps

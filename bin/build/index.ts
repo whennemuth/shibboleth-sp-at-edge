@@ -31,5 +31,10 @@ export { EDGE_REQUEST_ORIGIN_FUNCTION_BASENAME } from '../../lib/EdgeFunctionOri
 export { EDGE_REQUEST_VIEWER_FUNCTION_BASENAME } from '../../lib/EdgeFunctionViewerRequest';
 export { EDGE_RESPONSE_VIEWER_FUNCTION_BASENAME } from '../../lib/EdgeFunctionViewerResponse';
 
-// Lambda cleanup utility
+// Edge function and distribution naming, for the cleanup utilities
+export { EDGE_FUNCTION_BASENAMES, edgeFunctionName, distributionComment } from '../../lib/EdgeFunctionConstants';
+
+// Lambda cleanup utilities: teardown (deleteEdgeLambdaVersions), and pruning superseded versions after a deploy
 export { deleteVersions as deleteEdgeLambdaVersions } from '../DistributionToCleanup'
+export { pruneEdgeLambdaVersions } from '../../lib/EdgeVersionPruning';
+export type { PruneEdgeLambdaVersionsParms, PruneEdgeLambdaVersionsResult, EdgeFunctionVersion } from '../../lib/EdgeVersionPruning';

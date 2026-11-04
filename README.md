@@ -220,7 +220,21 @@ A more detailed view of the interaction between the end-user, origin request lam
   npm run cleanup dryrun
   ```
 
-  *Embedded:* `npm run cleanup` identifies the distribution from this project's `./context/context.json` (`TAGS.Landscape`), so it only applies to an embedded deployment if that file is set to the same landscape and region.
+  *Embedded:* `npm run cleanup` identifies the distribution from this project's `./context/context.json` (`TAGS.Landscape`), so it only applies to an embedded deployment if that file is set to the same landscape and region. From code, call `deleteEdgeLambdaVersions(functionList, landscape)` with your own landscape.
+
+**Old edge function versions:**
+
+- A deploy that changes an edge function (its code, or a `SHIBBOLETH` setting that reaches `edge-context.json`) publishes a new version of it. CloudFormation then tries to delete the version it replaced, but Lambda refuses until CloudFront has removed its replicas, which takes hours. So the deploy reports `DELETE_FAILED (skipped)` for each replaced version after a few minutes of retries, still succeeds, and leaves those versions behind. This is expected.
+
+- To delete those old versions without touching the distribution:
+
+  ```
+  npm run prune
+  ```
+
+  It deletes only versions older than the ones the distribution uses, never the distribution's own, and never changes the distribution, so it is safe to run while the site is live. A version CloudFront still has replicas of is skipped for a later run. Add `dryrun` to see what it would delete.
+
+  *Embedded:* call `pruneEdgeLambdaVersions({ stackId, landscape })` (your context's `STACK_ID` and `TAGS.Landscape`) after each deploy: each run deletes what earlier deploys left behind.
 
 **Rebuild:**
 
@@ -250,6 +264,8 @@ Deeper dives into unit testing and logging:
 See [USAGE.md](./bin/build/USAGE.md) for packaging and usage instructions.
 
 ## Release notes
+
+- **2.2.0** - Adds `pruneEdgeLambdaVersions` and `npm run prune` to delete the Lambda@Edge versions a deploy leaves behind (its `DELETE_FAILED (skipped)` versions), without changing the distribution (see "Old edge function versions" above). `deleteEdgeLambdaVersions` takes an optional landscape (it used this package's own `context/context.json`, never an embedding app's), finds the distribution on any page of the distribution list, and importing the package no longer sets `AWS_REGION`. Also exports `edgeFunctionName`, `distributionComment` and `EDGE_FUNCTION_BASENAMES`. The deployed resources are unchanged.
 
 - **2.1.0** - Adds the optional `SHIBBOLETH.cookieName` and `SHIBBOLETH.cookieDomain` context fields for sharing one sign-in across distributions (see [Sharing one sign-in across distributions](./context/README.md#sharing-one-sign-in-across-distributions)). They reach the edge functions through `edge-context.json`, and synth fails for a `cookieDomain` without `ORIGIN.subdomain`, one that doesn't contain it, or a value that isn't valid in a cookie. The demo app reads the cookie by the configured name. Requires shibboleth-sp 1.3.0. With neither field set, behavior is unchanged.
 

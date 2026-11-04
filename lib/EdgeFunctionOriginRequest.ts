@@ -4,7 +4,7 @@ import { Code, Runtime } from "aws-cdk-lib/aws-lambda";
 import { IContext } from "../context/IContext";
 import { Construct } from "constructs";
 import { CloudfrontDistribution } from "./Distribution";
-import { EDGE_REQUEST_ORIGIN_FUNCTION_BASENAME } from "./EdgeFunctionConstants";
+import { EDGE_REQUEST_ORIGIN_FUNCTION_BASENAME, edgeFunctionName } from "./EdgeFunctionConstants";
 import { stageEdgeFunctionAsset } from "./EdgeContext";
 
 export { EDGE_REQUEST_ORIGIN_FUNCTION_BASENAME };
@@ -51,7 +51,7 @@ export const createEdgeFunctionForOriginRequest = (scope:Construct, context:ICon
     runtime: Runtime.NODEJS_22_X,
     handler: `${EDGE_ORIGIN_REQUEST_ID}.handler`,
     code: Code.fromAsset(stageEdgeFunctionAsset(context, `${EDGE_ORIGIN_REQUEST_ID}.js`)),
-    functionName: `${STACK_ID}-${Landscape}-${EDGE_REQUEST_ORIGIN_FUNCTION_BASENAME}`
+    functionName: edgeFunctionName(STACK_ID, Landscape, EDGE_REQUEST_ORIGIN_FUNCTION_BASENAME)
   });
   edgeFunction.addToRolePolicy(getEdgeFunctionSecretsManagerPolicy(context.SHIBBOLETH.secret.secretArn));
   edgeFunction.addToRolePolicy(getEdgeFunctionLoggingPolicy());

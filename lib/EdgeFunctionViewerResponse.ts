@@ -3,7 +3,7 @@ import { IContext } from "../context/IContext";
 import { Code, Runtime } from "aws-cdk-lib/aws-lambda";
 import { EdgeLambda, LambdaEdgeEventType, experimental } from "aws-cdk-lib/aws-cloudfront";
 import { CloudfrontDistribution } from "./Distribution";
-import { EDGE_RESPONSE_VIEWER_FUNCTION_BASENAME } from "./EdgeFunctionConstants";
+import { EDGE_RESPONSE_VIEWER_FUNCTION_BASENAME, edgeFunctionName } from "./EdgeFunctionConstants";
 import { stageEdgeFunctionAsset } from "./EdgeContext";
 
 export { EDGE_RESPONSE_VIEWER_FUNCTION_BASENAME };
@@ -23,7 +23,7 @@ export const createEdgeFunctionForViewerResponse = (scope:Construct, context:ICo
     runtime: Runtime.NODEJS_22_X,
     handler: `${EDGE_VIEWER_RESPONSE_ID}.handler`,
     code: Code.fromAsset(stageEdgeFunctionAsset(context, `${EDGE_VIEWER_RESPONSE_ID}.js`)),
-    functionName: `${STACK_ID}-${Landscape}-${EDGE_RESPONSE_VIEWER_FUNCTION_BASENAME}`
+    functionName: edgeFunctionName(STACK_ID, Landscape, EDGE_RESPONSE_VIEWER_FUNCTION_BASENAME)
   });
 
   callback({

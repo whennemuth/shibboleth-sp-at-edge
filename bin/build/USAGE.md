@@ -142,6 +142,11 @@ This package is published as **CommonJS only** - there is no ESM build. Two reas
 - `lambdaViewerRequest`: The viewer request Lambda@Edge function
 - `lambdaViewerResponse`: The viewer response Lambda@Edge function
 
+### Edge function version cleanup
+
+- `pruneEdgeLambdaVersions({ stackId, landscape, dryrun? })`: after a deploy, deletes the edge function versions older than the ones the landscape's distribution uses. Never changes the distribution; a version CloudFront still has replicas of is reported as `deferred` for a later run. Resolves to `{ distributionId, deleted, kept, deferred, failed }`.
+- `deleteEdgeLambdaVersions(functionList, landscape)`: teardown only. Removes the edge functions from the distribution, then deletes every numbered version, waiting for replicas to go.
+
 ## Requirements
 
 - AWS CDK v2.223.0 or later

@@ -1,12 +1,15 @@
-import { CloudFrontClient, DistributionSummary, GetDistributionCommand, GetDistributionCommandOutput, ListDistributionsCommand, ListDistributionsResult, UpdateDistributionCommand, } from "@aws-sdk/client-cloudfront";
+import { CloudFrontClient, GetDistributionCommand, GetDistributionCommandOutput, UpdateDistributionCommand, } from "@aws-sdk/client-cloudfront";
 import { DeleteFunctionCommand, LambdaClient, ListVersionsByFunctionCommand, ListVersionsByFunctionCommandOutput } from "@aws-sdk/client-lambda";
 import { IContext } from '../context/IContext';
 import * as ctx from '../context/context.json';
+import { findShibbolethDistribution } from '../lib/EdgeVersionPruning';
 
+// This module is exported from the package (deleteEdgeLambdaVersions), so importing it must not change the
+// importer's environment: the region is set by the npm run cleanup entry point (LambdaVersionCleanup.ts),
+// not here. CloudFront is a global service, addressed through us-east-1.
 const context = ctx as IContext;
-const cloudFrontClient = new CloudFrontClient();
-const { REGION, TAGS: { Landscape } } = context;
-process.env.AWS_REGION = REGION;
+const cloudFrontClient = new CloudFrontClient({ region: 'us-east-1' });
+const { TAGS: { Landscape } } = context;
 let dryrun:string;
 
 if(process.argv.length > 2 && process.argv[2] === 'dryrun') {
@@ -30,16 +33,12 @@ export class DistributionToCleanup {
 
     // 1) Lookup the distribution ID
     console.log('Listing distributions...');
-    const listCommand = new ListDistributionsCommand({ });
-    const response = await cloudFrontClient.send(listCommand) as ListDistributionsResult;
-    const distributions = response.DistributionList?.Items?.filter((ds:DistributionSummary) => {
-      return ds.Comment && ds.Comment == `shib-lambda-${this.landscape}-distribution`;
-    }) as DistributionSummary[];
-    if(distributions!.length == 0) {
+    const distribution = await findShibbolethDistribution(cloudFrontClient, this.landscape);
+    if( ! distribution?.Id) {
       console.log('No such distribution, looks like it has already been deleted');
       return;
     }
-    const Id = distributions[0]!.Id;
+    const Id = distribution.Id;
 
     // 2) Use the ID to Get the full distribution
     console.log(`Looking up distribution ${Id}`);
@@ -216,12 +215,18 @@ const getVersion = (arn:string|undefined, lambdaClient:LambdaClient) => {
 
 
 /**
- * Delete all versions for all lambda functions
+ * Delete all versions for all lambda functions. A teardown tool: it first removes every lambda@edge function
+ * from the landscape's distribution, then deletes every numbered version (only $LATEST survives), waiting out
+ * replicas. To delete superseded versions while the distribution keeps serving, use pruneEdgeLambdaVersions.
+ *
+ * @param functionList Comma-delimited function names
+ * @param landscape The TAGS.Landscape of the distribution to disassociate. Defaults to this package's own
+ * context/context.json, so callers embedding the construct should pass their own.
  */
-export const deleteVersions = async (functionList:string) => {
+export const deleteVersions = async (functionList:string, landscape:string = Landscape) => {
 
   // 1) "Orphan" every lambda@edge function from the cloudfront distribution.
-  await (new DistributionToCleanup(Landscape)).disassociateFromCloudfrontDistribution();
+  await (new DistributionToCleanup(landscape)).disassociateFromCloudfrontDistribution();
 
   // 2) Get an array of all the lambda functions to process (from env as comma-delimited list)
   const functionArray:string[] = [];

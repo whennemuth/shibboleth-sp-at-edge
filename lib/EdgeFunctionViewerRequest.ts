@@ -3,7 +3,7 @@ import { IContext } from "../context/IContext";
 import { Code, Runtime } from "aws-cdk-lib/aws-lambda";
 import { EdgeLambda, experimental, LambdaEdgeEventType } from "aws-cdk-lib/aws-cloudfront";
 import { CloudfrontDistribution } from "./Distribution";
-import { EDGE_REQUEST_VIEWER_FUNCTION_BASENAME } from "./EdgeFunctionConstants";
+import { EDGE_REQUEST_VIEWER_FUNCTION_BASENAME, edgeFunctionName } from "./EdgeFunctionConstants";
 import { getEdgeFunctionLoggingPolicy, getEdgeFunctionSecretsManagerPolicy } from "./EdgeFunctionOriginRequest";
 import { stageEdgeFunctionAsset } from "./EdgeContext";
 
@@ -24,7 +24,7 @@ export const createEdgeFunctionForViewerRequest = (scope:Construct, context:ICon
     runtime: Runtime.NODEJS_22_X,
     handler: `${EDGE_VIEWER_REQUEST_ID}.handler`,
     code: Code.fromAsset(stageEdgeFunctionAsset(context, `${EDGE_VIEWER_REQUEST_ID}.js`)),
-    functionName: `${STACK_ID}-${Landscape}-${EDGE_REQUEST_VIEWER_FUNCTION_BASENAME}`
+    functionName: edgeFunctionName(STACK_ID, Landscape, EDGE_REQUEST_VIEWER_FUNCTION_BASENAME)
   });
   edgeFunction.addToRolePolicy(getEdgeFunctionSecretsManagerPolicy(context.SHIBBOLETH.secret.secretArn));
   edgeFunction.addToRolePolicy(getEdgeFunctionLoggingPolicy());
